@@ -10,25 +10,76 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
-body{background:linear-gradient(160deg,#050a18,#101a33);color:#fff;font-family:微软雅黑;min-height:100vh;padding:30px 15px;}
-.container{max-width:520px;margin:0 auto;text-align:center;}
-.logo{width:100px;height:100px;background:#ffd250;border-radius:50%;margin:0 auto 20px;display:flex;align-items:center;justify-content:center;font-size:50px;font-weight:bold;color:#101a33;}
-.title{font-size:26px;color:#ffd250;margin-bottom:10px;font-weight:bold;}
-.desc{color:#94a3b8;font-size:15px;margin-bottom:25px;}
-.btn-group{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap;}
-.btn{flex:1;padding:14px;border-radius:12px;border:none;font-weight:bold;color:#fff;cursor:pointer;font-size:15px;}
-.btn-trade{background:linear-gradient(90deg,#27c075,#1a9c5c);}
-.btn-get{background:linear-gradient(90deg,#407bff,#2554d1);}
+body{
+    background:linear-gradient(160deg,#050a18,#101a33);
+    color:#fff;
+    font-family:Microsoft Yahei,sans-serif;
+    min-height:100vh;
+    padding:40px 20px;
+}
+.main-wrap{
+    max-width:480px;
+    margin:0 auto;
+    text-align:center;
+}
+.main-logo{
+    width:90px;
+    height:90px;
+    background:#ffd250;
+    border-radius:50%;
+    margin:0 auto 24px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-size:46px;
+    font-weight:bold;
+    color:#101a33;
+}
+.main-title{
+    font-size:24px;
+    color:#ffd250;
+    font-weight:600;
+    margin-bottom:12px;
+}
+.main-desc{
+    font-size:14px;
+    color:#94a3b8;
+    line-height:1.6;
+    margin-bottom:50px;
+}
+.btn-box{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+.home-btn{
+    width:100%;
+    padding:16px 0;
+    border-radius:14px;
+    border:none;
+    font-size:16px;
+    font-weight:600;
+    color:#fff;
+    cursor:pointer;
+    transition:0.2s;
+}
+.btn-trade{
+    background:linear-gradient(90deg,#27c075,#1a9c5c);
+}
+.btn-div{
+    background:linear-gradient(90deg,#407bff,#2554d1);
+}
 </style>
 </head>
 <body>
-<div class="container">
-    <div class="logo">BF</div>
-    <h1 class="title">BF 生态官方平台</h1>
-    <p class="desc">一站式交易 | 持仓分红 | 生态应用</p>
-    <div class="btn-group">
-        <button class="btn btn-trade" onclick="location.href='trade.html'">进入交易专区</button>
-        <button class="btn btn-get" onclick="window.open('claim.html')">分红领取中心</button>
+<div class="main-wrap">
+    <div class="main-logo">BF</div>
+    <h1 class="main-title">BF 生态官方平台</h1>
+    <p class="main-desc">一站式链上交易 ｜ 持仓享生态分红权益</p>
+
+    <div class="btn-box">
+        <button class="home-btn btn-trade" onclick="location.href='trade.html'">进入交易专区</button>
+        <button class="home-btn btn-div" onclick="window.open('claim.html')">分红领取中心</button>
     </div>
 </div>
 </body>

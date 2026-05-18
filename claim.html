@@ -2,44 +2,115 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BF 分红领取中心</title>
     <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
     <style>
         * {margin:0;padding:0;box-sizing:border-box;}
-        body {background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;font-family:sans-serif;min-height:100vh;padding:20px;}
-        .card {max-width:500px;margin:0 auto;background:rgba(30,41,59,0.85);border-radius:20px;padding:30px;border:1px solid rgba(255,215,0,0.2);}
+        body {background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;font-family:sans-serif;min-height:100vh;padding:20px 15px;}
+        .main-card {max-width:500px;margin:0 auto;background:rgba(30,41,59,0.85);border-radius:20px;padding:30px 25px;border:1px solid rgba(255,215,0,0.2);}
         .title {text-align:center;font-size:24px;font-weight:bold;color:#ffd700;margin-bottom:30px;}
-        .item {display:flex;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.08);border-radius:12px;margin-bottom:12px;font-size:15px;}
-        .val {color:#ffd700;font-weight:600;word-break:break-all;}
+        .info-item {display:flex;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.08);border-radius:12px;margin-bottom:12px;font-size:15px;}
+        .info-value {color:#ffd700;font-weight:600;word-break:break-all;text-align:right;}
         .btn {width:100%;height:50px;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;margin-top:12px;}
-        .btn-conn {background:linear-gradient(90deg,#3b82f6,#2563eb);color:#fff;}
+        .btn-connect {background:linear-gradient(90deg,#3b82f6,#2563eb);color:#fff;}
+        .btn-claim {background:linear-gradient(90deg,#10b981,#059669);color:#fff;}
+        .btn-back {background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);}
+        .tip-text {text-align:center;margin-top:25px;font-size:13px;color:#94a3b8;line-height:1.6;}
     </style>
 </head>
 <body>
-    <div class="card">
+    <div class="main-card">
         <h2 class="title">BF 分红领取中心</h2>
-        <div class="item"><span>钱包地址</span><span class="val" id="addr">未连接</span></div>
-        <button class="btn btn-conn" onclick="connect()">连接钱包</button>
+
+        <div class="info-item">
+            <span>钱包地址</span>
+            <span class="info-value" id="walletAddr">未连接</span>
+        </div>
+        <div class="info-item">
+            <span>持有BF数量</span>
+            <span class="info-value" id="balanceNum">0.0000</span>
+        </div>
+        <div class="info-item">
+            <span>可领取分红</span>
+            <span class="info-value" id="divNum">0.0000</span>
+        </div>
+
+        <button class="btn btn-connect" onclick="connectWallet()">连接钱包</button>
+        <button class="btn btn-claim" onclick="manualClaim()">领取分红</button>
+        <button class="btn btn-back" onclick="location.href='index.html'">返回首页</button>
+
+        <div class="tip-text">
+            支持：MetaMask / TP钱包 / OKX钱包<br>
+            连接钱包后可查看资产并领取分红
+        </div>
     </div>
 
 <script>
-const CONTRACT = "0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f";
-let web3, account;
+// ==============================================
+// 你的合约地址（已帮你填好）
+// ==============================================
+const CONTRACT_ADDR = "0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f";
 
-async function connect(){
-    if(!window.ethereum){
-        alert("请安装 MetaMask 钱包插件！");
+const ABI = [
+    {"inputs":[],"name":"claimDividend","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"getMyPending","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+];
+
+let web3;
+let account;
+let contract;
+
+// 连接钱包
+async function connectWallet() {
+    if (!window.ethereum) {
+        alert("请安装 MetaMask 或在钱包浏览器中打开");
         return;
     }
-    try{
-        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+    try {
+        const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
         account = accounts[0];
-        document.getElementById("addr").innerText = account.slice(0,12)+"..."+account.slice(-8);
-        alert("连接成功！");
-    }catch(e){
-        alert("连接失败："+e.message);
+        web3 = new Web3(window.ethereum);
+        contract = new web3.eth.Contract(ABI, CONTRACT_ADDR);
+
+        document.getElementById("walletAddr").innerText = account.slice(0, 12) + "..." + account.slice(-8);
+        refreshData();
+    } catch (e) {
+        alert("连接失败：" + e.message);
     }
+}
+
+// 刷新资产与可领取分红
+async function refreshData() {
+    if (!account || !contract) return;
+    try {
+        let bal = await contract.methods.balanceOf(account).call();
+        let pending = await contract.methods.getMyPending().call();
+        
+        document.getElementById("balanceNum").innerText = Number(web3.utils.fromWei(bal, "ether")).toFixed(4);
+        document.getElementById("divNum").innerText = Number(web3.utils.fromWei(pending, "ether")).toFixed(4);
+    } catch (e) {}
+}
+
+// 领取分红
+async function manualClaim() {
+    if (!account) {
+        alert("请先连接钱包");
+        return;
+    }
+    try {
+        await contract.methods.claimDividend().send({ from: account });
+        alert("领取成功！");
+        refreshData();
+    } catch (e) {
+        alert("领取失败：" + e.message);
+    }
+}
+
+// 监听钱包切换
+if (window.ethereum) {
+    window.ethereum.on("accountsChanged", () => location.reload());
 }
 </script>
 </body>

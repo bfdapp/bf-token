@@ -89,13 +89,22 @@ body{
     color:#fff;
     font-size:15px;
     cursor:pointer;
-    margin-bottom:15px;
+    margin-bottom:10px;
 }
 .status{
     text-align:center;
     font-size:13px;
     color:#94a3b8;
     margin:12px 0;
+}
+.balance-box{
+    background:rgba(255,255,255,0.05);
+    border-radius:10px;
+    padding:10px;
+    text-align:center;
+    font-size:14px;
+    color:#eee;
+    margin-bottom:15px;
 }
 .back-btn{
     display:block;
@@ -123,6 +132,12 @@ body{
 
     <button class="wallet-btn" id="connectBtn">连接BSC钱包</button>
     <div class="status" id="walletStatus">未连接钱包</div>
+
+    <!-- 余额显示区 -->
+    <div class="balance-box" id="balanceBox" style="display:none;">
+        BNB余额：<span id="bnbBalance">0.0000</span> &nbsp;&nbsp;
+        BF余额：<span id="bfBalance">0.00</span>
+    </div>
 
     <!-- 切换标签 -->
     <div class="tab-box">
@@ -169,9 +184,7 @@ const BSC_CHAIN_ID = 56;
 const BF_TOKEN = "0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f";
 const PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
-// 兑换比例 1BNB = 1200BF
 const SWAP_RATE = 1200;
-// 滑点 5%
 const SLIPPAGE = 0.95;
 
 let provider, signer, routerContract, bfContract;
@@ -179,6 +192,10 @@ let provider, signer, routerContract, bfContract;
 // DOM
 const connectBtn = document.getElementById("connectBtn");
 const walletStatus = document.getElementById("walletStatus");
+const balanceBox = document.getElementById("balanceBox");
+const bnbBalance = document.getElementById("bnbBalance");
+const bfBalance = document.getElementById("bfBalance");
+
 const buyTab = document.getElementById("buyTab");
 const sellTab = document.getElementById("sellTab");
 const buyBox = document.getElementById("buyBox");
@@ -244,6 +261,24 @@ async function switchBSC() {
     }catch(e){}
 }
 
+// 刷新余额
+async function refreshBalances(address) {
+    try {
+        // BNB余额
+        const bnbWei = await provider.getBalance(address);
+        bnbBalance.innerText = ethers.utils.formatEther(bnbWei).slice(0,6);
+
+        // BF余额
+        const bfDec = await bfContract.decimals();
+        const bfWei = await bfContract.balanceOf(address);
+        bfBalance.innerText = ethers.utils.formatUnits(bfWei, bfDec).slice(0,5);
+
+        balanceBox.style.display = "block";
+    } catch (e) {
+        console.error("刷新余额失败", e);
+    }
+}
+
 // 连接钱包
 connectBtn.addEventListener("click",async ()=>{
     if(!window.ethereum){
@@ -258,16 +293,36 @@ connectBtn.addEventListener("click",async ()=>{
         const net = await provider.getNetwork();
         if(net.chainId !== BSC_CHAIN_ID){
             walletStatus.innerText = "请手动切换至BSC智能链";
+            balanceBox.style.display = "none";
             return;
         }
         routerContract = new ethers.Contract(PANCAKE_ROUTER, ROUTER_ABI, signer);
         bfContract = new ethers.Contract(BF_TOKEN, TOKEN_ABI, signer);
         const addr = await signer.getAddress();
         walletStatus.innerText = `已连接: ${addr.slice(0,6)}...${addr.slice(-4)}`;
+        await refreshBalances(addr);
     }catch(e){
         walletStatus.innerText = "连接失败";
+        balanceBox.style.display = "none";
     }
 })
+
+// 钱包账户/网络变化时自动刷新余额
+if (window.ethereum) {
+    window.ethereum.on("accountsChanged", async (accounts) => {
+        if (accounts.length && signer) {
+            await refreshBalances(accounts[0]);
+        } else {
+            balanceBox.style.display = "none";
+        }
+    });
+    window.ethereum.on("chainChanged", async () => {
+        if (signer) {
+            const addr = await signer.getAddress();
+            await refreshBalances(addr);
+        }
+    });
+}
 
 // BNB买入BF
 buyBtn.addEventListener("click",async ()=>{
@@ -289,6 +344,7 @@ buyBtn.addEventListener("click",async ()=>{
         alert(`买入交易已提交!\n交易哈希:${tx.hash}`);
         await tx.wait();
         alert("买入成功，BF已到账！");
+        await refreshBalances(userAddr);
     }catch(e){
         if(e.message.includes("insufficient funds")) alert("BNB余额不足");
         else alert("交易失败："+e.message.substr(0,50));
@@ -323,6 +379,7 @@ sellBtn.addEventListener("click",async ()=>{
         alert(`卖出交易已提交!\n交易哈希:${tx.hash}`);
         await tx.wait();
         alert("卖出成功，BNB已到账！");
+        await refreshBalances(userAddr);
     }catch(e){
         if(e.message.includes("allowance")) alert("授权失败，请重试");
         else alert("交易失败："+e.message.substr(0,50));

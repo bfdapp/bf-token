@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>BF 生态官方首页</title>
+    <title>BF 生态官方平台</title>
 
     <!-- BF 图标 -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
@@ -50,23 +50,23 @@
             margin-bottom:30px;
         }
 
-        /* 内嵌 Swap 面板 */
+        /* 优化后的内嵌 Swap 面板 */
         .swap-card{
             background:rgba(16,26,51,0.9);
             border-radius:20px;
-            padding:25px;
+            padding:20px;
             border:1px solid rgba(255,210,80,0.2);
             box-shadow:0 10px 40px rgba(0,0,0,0.4);
         }
         .swap-title{
             font-size:18px;
             color:#ffd250;
-            margin-bottom:20px;
+            margin-bottom:15px;
             font-weight:bold;
         }
         iframe{
             width:100%;
-            height:580px;
+            height:480px; /* 调整高度，只保留交易核心区域 */
             border:none;
             border-radius:14px;
             background:#0b1224;
@@ -99,10 +99,11 @@
         <h1 class="title">BF 生态官方平台</h1>
         <p class="desc">一站式交易 | 持仓分红 | 生态应用</p>
 
-        <!-- 直接内嵌博饼SWAP交易面板 -->
+        <!-- 优化后的交易面板 -->
         <div class="swap-card">
             <h2 class="swap-title">BNB ↔ BF 官方交易区</h2>
-            <iframe src="https://pancakeswap.finance/swap?inputCurrency=BNB&outputCurrency=0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f"></iframe>
+            <!-- 隐藏多余导航，只保留交易核心功能 -->
+            <iframe src="https://pancakeswap.finance/swap?inputCurrency=BNB&outputCurrency=0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f&disableNavbar=true&disableFooter=true"></iframe>
         </div>
 
         <div class="btns">

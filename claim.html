@@ -13,6 +13,7 @@
         .info-item {display:flex;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.08);border-radius:12px;margin-bottom:12px;font-size:15px;}
         .info-value {color:#ffd700;font-weight:600;word-break:break-all;text-align:right;}
         .btn {width:100%;height:50px;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;margin-top:12px;}
+        .btn:disabled {opacity:0.6;cursor:not-allowed;}
         .btn-connect {background:linear-gradient(90deg,#3b82f6,#2563eb);color:#fff;}
         .btn-claim {background:linear-gradient(90deg,#10b981,#059669);color:#fff;}
         .btn-back {background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);}
@@ -35,21 +36,22 @@
             <span>可领取分红</span>
             <span class="info-value" id="divNum">0.0000</span>
         </div>
+        <div class="info-item">
+            <span>当前钱包</span>
+            <span class="info-value" id="walletType">未检测</span>
+        </div>
 
-        <button class="btn btn-connect" onclick="connectWallet()">连接钱包</button>
+        <button class="btn btn-connect" id="connectBtn" onclick="connectWallet()">连接钱包</button>
         <button class="btn btn-claim" onclick="manualClaim()">领取分红</button>
         <button class="btn btn-back" onclick="location.href='index.html'">返回首页</button>
 
         <div class="tip-text">
-            支持：MetaMask / TP钱包 / OKX钱包<br>
+            支持：MetaMask / TP / Trust / OKX / Bitget 等主流钱包<br>
             连接钱包后可查看资产并领取分红
         </div>
     </div>
 
 <script>
-// ==============================================
-// 你的合约地址（已帮你填好）
-// ==============================================
 const CONTRACT_ADDR = "0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f";
 
 const ABI = [
@@ -61,27 +63,46 @@ const ABI = [
 let web3;
 let account;
 let contract;
+let isConnecting = false;
 
-// 连接钱包
+function getWalletName(){
+    if(!window.ethereum) return "未检测";
+    if(window.ethereum.isMetaMask) return "MetaMask(小狐狸)";
+    if(window.ethereum.isTokenPocket) return "TP钱包";
+    if(window.ethereum.isTrust) return "Trust钱包";
+    if(window.ethereum.isOkxWallet) return "OKX钱包";
+    if(window.ethereum.isBitget) return "Bitget钱包";
+    return "通用Web3钱包";
+}
+
 async function connectWallet() {
+    if (isConnecting) return;
     if (!window.ethereum) {
-        alert("请安装 MetaMask 或在钱包浏览器中打开");
+        alert("请安装 MetaMask/Trust/OKX 等钱包，或在钱包内置浏览器中打开");
         return;
     }
     try {
+        isConnecting = true;
+        document.getElementById("connectBtn").disabled = true;
+        document.getElementById("connectBtn").innerText = "连接中...";
+        
         const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
         account = accounts[0];
         web3 = new Web3(window.ethereum);
         contract = new web3.eth.Contract(ABI, CONTRACT_ADDR);
 
         document.getElementById("walletAddr").innerText = account.slice(0, 12) + "..." + account.slice(-8);
+        document.getElementById("walletType").innerText = getWalletName();
         refreshData();
     } catch (e) {
         alert("连接失败：" + e.message);
+    } finally {
+        isConnecting = false;
+        document.getElementById("connectBtn").disabled = false;
+        document.getElementById("connectBtn").innerText = "连接钱包";
     }
 }
 
-// 刷新资产与可领取分红
 async function refreshData() {
     if (!account || !contract) return;
     try {
@@ -93,7 +114,6 @@ async function refreshData() {
     } catch (e) {}
 }
 
-// 领取分红
 async function manualClaim() {
     if (!account) {
         alert("请先连接钱包");
@@ -108,7 +128,6 @@ async function manualClaim() {
     }
 }
 
-// 监听钱包切换
 if (window.ethereum) {
     window.ethereum.on("accountsChanged", () => location.reload());
 }

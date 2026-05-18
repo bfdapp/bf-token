@@ -2,89 +2,113 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>BF 生态官方首页</title>
-    
-    <!-- 图标引用代码，和分红页完全一致 -->
+
+    <!-- BF 图标 -->
     <link rel="icon" type="image/x-icon" href="favicon.ico">
     <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
     <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
-    <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png">
     <link rel="apple-touch-icon" href="apple-touch-icon.png">
-    <link rel="manifest" href="site.webmanifest">
 
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            font-family: "Microsoft Yahei", sans-serif;
+        *{margin:0;padding:0;box-sizing:border-box;}
+        body{
             background: linear-gradient(160deg, #050a18, #101a33);
-            color: #fff;
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
+            color:#fff;
+            font-family: "Microsoft Yahei",sans-serif;
+            min-height:100vh;
+            padding:30px 15px;
         }
-        .container {
-            text-align: center;
-            max-width: 600px;
-            padding: 20px;
+        .container{
+            max-width:520px;
+            margin:0 auto;
+            text-align:center;
         }
-        .logo {
-            width: 120px;
-            height: 120px;
-            background: #ffd250;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin: 0 auto 30px;
+        .logo{
+            width:100px;
+            height:100px;
+            background:#ffd250;
+            border-radius:50%;
+            margin:0 auto 20px;
+            display:flex;
+            align-items:center;
+            justify-content:center;
+            font-size:50px;
+            font-weight:bold;
+            color:#101a33;
         }
-        .logo-text {
-            font-size: 60px;
-            color: #101a33;
-            font-weight: bold;
+        .title{
+            font-size:26px;
+            color:#ffd250;
+            margin-bottom:10px;
+            font-weight:700;
         }
-        .title {
-            font-size: 32px;
-            color: #ffd250;
-            margin-bottom: 20px;
+        .desc{
+            color:#94a3b8;
+            font-size:15px;
+            margin-bottom:30px;
         }
-        .desc {
-            font-size: 16px;
-            color: #94a3b8;
-            line-height: 1.8;
-            margin-bottom: 40px;
+
+        /* 内嵌 Swap 面板 */
+        .swap-card{
+            background:rgba(16,26,51,0.9);
+            border-radius:20px;
+            padding:25px;
+            border:1px solid rgba(255,210,80,0.2);
+            box-shadow:0 10px 40px rgba(0,0,0,0.4);
         }
-        .btn {
-            display: inline-block;
-            padding: 15px 40px;
-            background: linear-gradient(90deg, #407bff, #2554d1);
-            color: #fff;
-            text-decoration: none;
-            border-radius: 12px;
-            font-size: 18px;
-            font-weight: 600;
-            transition: 0.3s;
+        .swap-title{
+            font-size:18px;
+            color:#ffd250;
+            margin-bottom:20px;
+            font-weight:bold;
         }
-        .btn:hover {
-            transform: scale(1.05);
+        iframe{
+            width:100%;
+            height:580px;
+            border:none;
+            border-radius:14px;
+            background:#0b1224;
+        }
+
+        .btns{
+            margin-top:20px;
+            display:flex;
+            gap:10px;
+        }
+        .btn{
+            flex:1;
+            padding:14px;
+            border-radius:12px;
+            background:linear-gradient(90deg,#407bff,#2554d1);
+            color:#fff;
+            font-weight:bold;
+            border:none;
+            cursor:pointer;
+        }
+        .btn.claim{
+            background:linear-gradient(90deg,#27c075,#1a9c5c);
         }
     </style>
 </head>
+
 <body>
     <div class="container">
-        <div class="logo">
-            <div class="logo-text">BF</div>
+        <div class="logo">BF</div>
+        <h1 class="title">BF 生态官方平台</h1>
+        <p class="desc">一站式交易 | 持仓分红 | 生态应用</p>
+
+        <!-- 直接内嵌博饼SWAP交易面板 -->
+        <div class="swap-card">
+            <h2 class="swap-title">BNB ↔ BF 官方交易区</h2>
+            <iframe src="https://pancakeswap.finance/swap?inputCurrency=BNB&outputCurrency=0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f"></iframe>
         </div>
-        <h1 class="title">BF 生态官方首页</h1>
-        <p class="desc">
-            欢迎来到 BF 生态，参与社区治理，享受分红权益<br>
-            持有 BF 代币，一键领取链上分红奖励
-        </p>
-        <a href="claim.html" class="btn">前往分红领取中心</a>
+
+        <div class="btns">
+            <button class="btn" onclick="window.open('https://bfdapp.github.io/bf-token/claim.html')">分红领取</button>
+            <button class="btn claim">官方公告</button>
+        </div>
     </div>
 </body>
 </html>

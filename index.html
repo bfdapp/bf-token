@@ -3,51 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BF Token - Official Website</title>
+    <title>BF 生态官方首页</title>
+    
+    <!-- 图标引用代码，和分红页完全一致 -->
+    <link rel="icon" type="image/x-icon" href="favicon.ico">
+    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16x16.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="192x192" href="android-chrome-192x192.png">
+    <link rel="icon" type="image/png" sizes="512x512" href="android-chrome-512x512.png">
+    <link rel="apple-touch-icon" href="apple-touch-icon.png">
+    <link rel="manifest" href="site.webmanifest">
+
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;font-family:'PingFang SC','Microsoft Yahei',sans-serif;}
-        body{background:#0b1221;color:#fff;}
-        .hero{
-            background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);
-            min-height:100vh;
-            display:flex;flex-direction:column;
-            align-items:center;justify-content:center;
-            padding:20px;text-align:center;
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Microsoft Yahei", sans-serif;
+            background: linear-gradient(160deg, #050a18, #101a33);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
         }
-        .logo{
-            width:100px;height:100px;
-            background:#ffd700;border-radius:50%;
-            display:flex;align-items:center;justify-content:center;
-            font-size:36px;font-weight:bold;color:#0b1221;
-            margin-bottom:30px;
+        .container {
+            text-align: center;
+            max-width: 600px;
+            padding: 20px;
         }
-        .title{font-size:38px;margin-bottom:14px;color:#ffd700;}
-        .subtitle{
-            font-size:18px;color:#ccc;margin-bottom:40px;
-            max-width:500px;line-height:1.6;
+        .logo {
+            width: 120px;
+            height: 120px;
+            background: #ffd250;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 30px;
         }
-        .btn-group{display:flex;flex-direction:column;gap:16px;width:100%;max-width:320px;}
-        .btn{
-            padding:16px 20px;border-radius:14px;
-            font-size:16px;font-weight:bold;border:none;
-            cursor:pointer;transition:0.2s;
+        .logo-text {
+            font-size: 60px;
+            color: #101a33;
+            font-weight: bold;
         }
-        .btn-primary{background:linear-gradient(90deg,#ffd700,#ffc107);color:#111;}
-        .btn-secondary{background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);}
-        .btn:active{transform:scale(0.97);}
-        .desc{margin-top:50px;color:#777;font-size:13px;line-height:1.7;}
+        .title {
+            font-size: 32px;
+            color: #ffd250;
+            margin-bottom: 20px;
+        }
+        .desc {
+            font-size: 16px;
+            color: #94a3b8;
+            line-height: 1.8;
+            margin-bottom: 40px;
+        }
+        .btn {
+            display: inline-block;
+            padding: 15px 40px;
+            background: linear-gradient(90deg, #407bff, #2554d1);
+            color: #fff;
+            text-decoration: none;
+            border-radius: 12px;
+            font-size: 18px;
+            font-weight: 600;
+            transition: 0.3s;
+        }
+        .btn:hover {
+            transform: scale(1.05);
+        }
     </style>
 </head>
 <body>
-    <div class="hero">
-        <div class="logo">BF</div>
-        <h1 class="title">BF Token</h1>
-        <p class="subtitle">去中心化持币分红生态 | 持有即收益 | 社区自治 | 链上自动分红</p>
-        <div class="btn-group">
-            <button class="btn btn-primary" onclick="location.href='claim.html'">进入分红领取中心</button>
-            <button class="btn btn-secondary" onclick="alert('官方白皮书即将上线')">查看白皮书</button>
+    <div class="container">
+        <div class="logo">
+            <div class="logo-text">BF</div>
         </div>
-        <div class="desc">安全开源 | 链上自动执行 | 100% 去中心化<br>持币 ≥ 10000 BF 即可每日享受全网交易分红</div>
+        <h1 class="title">BF 生态官方首页</h1>
+        <p class="desc">
+            欢迎来到 BF 生态，参与社区治理，享受分红权益<br>
+            持有 BF 代币，一键领取链上分红奖励
+        </p>
+        <a href="claim.html" class="btn">前往分红领取中心</a>
     </div>
 </body>
 </html>

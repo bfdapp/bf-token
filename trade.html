@@ -3,13 +3,15 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>BF 交易专区</title>
+<title>BF 双向币币交易</title>
 <link rel="icon" href="favicon.ico">
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box;}
 body{
     background:#0b1224;
-    padding:30px 16px;
+    padding:25px 16px;
+    font-family:Microsoft Yahei,sans-serif;
 }
 .trade-container{
     max-width:480px;
@@ -20,29 +22,313 @@ body{
     font-size:18px;
     color:#ffd250;
     font-weight:600;
-    margin-bottom:16px;
+    margin-bottom:20px;
 }
-.swap-iframe{
-    width:100%;
-    height:410px;
-    border:none;
+.tab-box{
+    display:flex;
+    gap:8px;
+    margin-bottom:15px;
+}
+.tab-item{
+    flex:1;
+    text-align:center;
+    padding:12px 0;
+    border-radius:10px;
+    background:#161e33;
+    color:#999;
+    font-size:15px;
+    cursor:pointer;
+}
+.tab-item.active{
+    background:linear-gradient(90deg,#27c075,#1a9c5c);
+    color:#fff;
+}
+.swap-box{
+    background:rgba(255,255,255,0.08);
     border-radius:16px;
+    padding:20px;
+    border:1px solid rgba(255,210,80,0.2);
+}
+.input-item{
+    margin-bottom:15px;
+}
+.input-item label{
+    display:block;
+    color:#ccc;
+    font-size:14px;
+    margin-bottom:6px;
+}
+.input-item input{
+    width:100%;
+    padding:14px;
+    border-radius:10px;
+    border:none;
+    background:#161e33;
+    color:#fff;
+    font-size:15px;
+    outline:none;
+}
+.swap-btn{
+    width:100%;
+    padding:15px;
+    border:none;
+    border-radius:10px;
+    background:linear-gradient(90deg,#27c075,#1a9c5c);
+    color:#fff;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+    margin-top:10px;
+}
+.wallet-btn{
+    width:100%;
+    padding:13px;
+    border:none;
+    border-radius:10px;
+    background:linear-gradient(90deg,#407bff,#2554d1);
+    color:#fff;
+    font-size:15px;
+    cursor:pointer;
+    margin-bottom:15px;
+}
+.status{
+    text-align:center;
+    font-size:13px;
+    color:#94a3b8;
+    margin:12px 0;
 }
 .back-btn{
     display:block;
     text-align:center;
-    margin-top:20px;
+    margin-top:25px;
     color:#ffd250;
     text-decoration:none;
     font-size:15px;
 }
+.tips{
+    background:rgba(255,210,80,0.1);
+    padding:12px;
+    border-radius:10px;
+    margin:15px 0;
+    font-size:13px;
+    color:#ffd250;
+    line-height:1.6;
+}
+.hide{display:none;}
 </style>
 </head>
 <body>
 <div class="trade-container">
-    <h3 class="trade-tit">BNB ↔ BF 币币交易</h3>
-    <iframe class="swap-iframe" src="https://pancakeswap.finance/swap?inputCurrency=BNB&outputCurrency=0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    <h3 class="trade-tit">BNB ↔ BF 双向链上兑换</h3>
+
+    <button class="wallet-btn" id="connectBtn">连接BSC钱包</button>
+    <div class="status" id="walletStatus">未连接钱包</div>
+
+    <!-- 切换标签 -->
+    <div class="tab-box">
+        <div class="tab-item active" id="buyTab">BNB买BF</div>
+        <div class="tab-item" id="sellTab">BF卖BNB</div>
+    </div>
+
+    <!-- 买入板块 -->
+    <div class="swap-box" id="buyBox">
+        <div class="input-item">
+            <label>支付 BNB 数量</label>
+            <input type="number" id="payBnb" placeholder="输入BNB数量" min="0" step="0.01">
+        </div>
+        <div class="input-item">
+            <label>预估获得 BF 数量</label>
+            <input type="number" id="getBf" placeholder="自动实时估算" readonly>
+        </div>
+        <button class="swap-btn" id="buyBtn">确认买入BF</button>
+    </div>
+
+    <!-- 卖出板块 -->
+    <div class="swap-box hide" id="sellBox">
+        <div class="input-item">
+            <label>卖出 BF 数量</label>
+            <input type="number" id="payBf" placeholder="输入BF数量" min="0" step="1">
+        </div>
+        <div class="input-item">
+            <label>预估获得 BNB 数量</label>
+            <input type="number" id="getBnb" placeholder="自动实时估算" readonly>
+        </div>
+        <button class="swap-btn" id="sellBtn">确认卖出换BNB</button>
+    </div>
+
+    <div class="tips">
+        须知：自动添加切换BSC币安智能链，国内普通网络直连无需加速器，交易采用薄饼官方路由
+    </div>
+
     <a href="index.html" class="back-btn">← 返回官方首页</a>
 </div>
+
+<script>
+// 全局配置
+const BSC_CHAIN_ID = 56;
+const BF_TOKEN = "0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f";
+const PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
+const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
+// 兑换比例 1BNB = 1200BF
+const SWAP_RATE = 1200;
+// 滑点 5%
+const SLIPPAGE = 0.95;
+
+let provider, signer, routerContract, bfContract;
+
+// DOM
+const connectBtn = document.getElementById("connectBtn");
+const walletStatus = document.getElementById("walletStatus");
+const buyTab = document.getElementById("buyTab");
+const sellTab = document.getElementById("sellTab");
+const buyBox = document.getElementById("buyBox");
+const sellBox = document.getElementById("sellBox");
+
+const payBnb = document.getElementById("payBnb");
+const getBf = document.getElementById("getBf");
+const buyBtn = document.getElementById("buyBtn");
+
+const payBf = document.getElementById("payBf");
+const getBnb = document.getElementById("getBnb");
+const sellBtn = document.getElementById("sellBtn");
+
+// ABI
+const ROUTER_ABI = [
+    "function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)",
+    "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)"
+];
+const TOKEN_ABI = [
+    "function approve(address spender, uint256 amount) external returns (bool)",
+    "function balanceOf(address owner) external view returns (uint256)",
+    "function decimals() external view returns (uint8)"
+];
+
+// 标签切换
+buyTab.onclick = ()=>{
+    buyTab.classList.add("active");
+    sellTab.classList.remove("active");
+    buyBox.classList.remove("hide");
+    sellBox.classList.add("hide");
+}
+sellTab.onclick = ()=>{
+    sellTab.classList.add("active");
+    buyTab.classList.remove("active");
+    sellBox.classList.remove("hide");
+    buyBox.classList.add("hide");
+}
+
+// 买入实时计算
+payBnb.addEventListener("input",()=>{
+    let v = Number(payBnb.value)||0;
+    getBf.value = (v * SWAP_RATE).toFixed(2);
+})
+// 卖出实时计算
+payBf.addEventListener("input",()=>{
+    let v = Number(payBf.value)||0;
+    getBnb.value = (v / SWAP_RATE).toFixed(6);
+})
+
+// 自动添加BSC链
+async function switchBSC() {
+    try {
+        await window.ethereum.request({
+            method: "wallet_addEthereumChain",
+            params: [{
+                chainId: "0x38",
+                chainName: "Binance Smart Chain",
+                nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
+                rpcUrls: ["https://bsc-dataseed1.binance.org"],
+                blockExplorerUrls: ["https://bscscan.com"]
+            }]
+        });
+    }catch(e){}
+}
+
+// 连接钱包
+connectBtn.addEventListener("click",async ()=>{
+    if(!window.ethereum){
+        alert("请安装MetaMask/TP钱包等Web3钱包");
+        return;
+    }
+    try{
+        await window.ethereum.request({method:"eth_requestAccounts"});
+        await switchBSC();
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        signer = provider.getSigner();
+        const net = await provider.getNetwork();
+        if(net.chainId !== BSC_CHAIN_ID){
+            walletStatus.innerText = "请手动切换至BSC智能链";
+            return;
+        }
+        routerContract = new ethers.Contract(PANCAKE_ROUTER, ROUTER_ABI, signer);
+        bfContract = new ethers.Contract(BF_TOKEN, TOKEN_ABI, signer);
+        const addr = await signer.getAddress();
+        walletStatus.innerText = `已连接: ${addr.slice(0,6)}...${addr.slice(-4)}`;
+    }catch(e){
+        walletStatus.innerText = "连接失败";
+    }
+})
+
+// BNB买入BF
+buyBtn.addEventListener("click",async ()=>{
+    if(!signer) return alert("请先连接钱包");
+    let bnbVal = Number(payBnb.value);
+    if(!bnbVal||bnbVal<=0) return alert("请输入正确BNB数量");
+
+    buyBtn.innerText = "交易发起中...";
+    try{
+        const value = ethers.utils.parseEther(bnbVal.toString());
+        const minReceive = ethers.utils.parseEther((bnbVal * SWAP_RATE * SLIPPAGE).toFixed(6));
+        const path = [WBNB, BF_TOKEN];
+        const userAddr = await signer.getAddress();
+        const deadline = Math.floor(Date.now()/1000)+600;
+
+        const tx = await routerContract.swapExactETHForTokens(
+            minReceive,path,userAddr,deadline,{value:value}
+        );
+        alert(`买入交易已提交!\n交易哈希:${tx.hash}`);
+        await tx.wait();
+        alert("买入成功，BF已到账！");
+    }catch(e){
+        if(e.message.includes("insufficient funds")) alert("BNB余额不足");
+        else alert("交易失败："+e.message.substr(0,50));
+    }
+    buyBtn.innerText = "确认买入BF";
+})
+
+// BF卖出换BNB
+sellBtn.addEventListener("click",async ()=>{
+    if(!signer) return alert("请先连接钱包");
+    let bfVal = Number(payBf.value);
+    if(!bfVal||bfVal<=0) return alert("请输入正确BF数量");
+
+    sellBtn.innerText = "授权并卖出中...";
+    try{
+        const userAddr = await signer.getAddress();
+        const bfDec = await bfContract.decimals();
+        const sellAmount = ethers.utils.parseUnits(bfVal.toString(),bfDec);
+        const expectBnb = bfVal / SWAP_RATE;
+        const minBnb = ethers.utils.parseEther((expectBnb * SLIPPAGE).toFixed(6));
+        const path = [BF_TOKEN, WBNB];
+        const deadline = Math.floor(Date.now()/1000)+600;
+
+        // 先授权路由使用BF
+        let allowanceTx = await bfContract.approve(PANCAKE_ROUTER,sellAmount);
+        await allowanceTx.wait();
+
+        // 执行卖出兑换
+        const tx = await routerContract.swapExactTokensForETH(
+            sellAmount,minBnb,path,userAddr,deadline
+        );
+        alert(`卖出交易已提交!\n交易哈希:${tx.hash}`);
+        await tx.wait();
+        alert("卖出成功，BNB已到账！");
+    }catch(e){
+        if(e.message.includes("allowance")) alert("授权失败，请重试");
+        else alert("交易失败："+e.message.substr(0,50));
+    }
+    sellBtn.innerText = "确认卖出换BNB";
+})
+</script>
 </body>
 </html>

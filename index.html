@@ -2,52 +2,158 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BF Token - Official Website</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BF 分红领取中心</title>
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.8.2/dist/web3.min.js"></script>
     <style>
-        *{margin:0;padding:0;box-sizing:border-box;font-family:'PingFang SC','Microsoft Yahei',sans-serif;}
-        body{background:#0b1221;color:#fff;}
-        .hero{
-            background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%);
-            min-height:100vh;
-            display:flex;flex-direction:column;
-            align-items:center;justify-content:center;
-            padding:20px;text-align:center;
-        }
-        .logo{
-            width:100px;height:100px;
-            background:#ffd700;border-radius:50%;
-            display:flex;align-items:center;justify-content:center;
-            font-size:36px;font-weight:bold;color:#0b1221;
-            margin-bottom:30px;
-        }
-        .title{font-size:38px;margin-bottom:14px;color:#ffd700;}
-        .subtitle{
-            font-size:18px;color:#ccc;margin-bottom:40px;
-            max-width:500px;line-height:1.6;
-        }
-        .btn-group{display:flex;flex-direction:column;gap:16px;width:100%;max-width:320px;}
-        .btn{
-            padding:16px 20px;border-radius:14px;
-            font-size:16px;font-weight:bold;border:none;
-            cursor:pointer;transition:0.2s;
-        }
-        .btn-primary{background:linear-gradient(90deg,#ffd700,#ffc107);color:#111;}
-        .btn-secondary{background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);}
-        .btn:active{transform:scale(0.97);}
-        .desc{margin-top:50px;color:#777;font-size:13px;line-height:1.7;}
+        * {margin:0;padding:0;box-sizing:border-box;}
+        body {background:linear-gradient(135deg,#0f172a,#1e293b);color:#fff;font-family:"PingFang SC","Microsoft Yahei",sans-serif;min-height:100vh;padding:20px 15px;}
+        .main-card {max-width:500px;margin:0 auto;background:rgba(30,41,59,0.85);border-radius:20px;padding:30px 25px;box-shadow:0 8px 32px rgba(0,0,0,0.3);border:1px solid rgba(255,215,0,0.2);}
+        .title {text-align:center;font-size:24px;font-weight:bold;color:#ffd700;margin-bottom:30px;}
+        .info-item {display:flex;justify-content:space-between;padding:14px 16px;background:rgba(255,255,255,0.08);border-radius:12px;margin-bottom:12px;font-size:15px;}
+        .info-value {color:#ffd700;font-weight:600;word-break:break-all;text-align:right;}
+        .status-box {padding:12px 16px;background:rgba(22,163,74,0.15);border-radius:12px;text-align:center;margin:20px 0;font-size:14px;color:#4ade80;}
+        .record-box{margin-top:15px;padding:15px;background:rgba(255,255,255,0.05);border-radius:12px;}
+        .record-title{font-size:15px;color:#ffd700;margin-bottom:10px;}
+        .record-item{font-size:13px;color:#cbd5e1;line-height:1.8;}
+        .btn {width:100%;height:50px;line-height:50px;border:none;border-radius:12px;font-size:16px;font-weight:600;cursor:pointer;transition:all 0.3s ease;margin-top:12px;}
+        .btn-connect {background:linear-gradient(90deg,#3b82f6,#2563eb);color:#fff;}
+        .btn-claim {background:linear-gradient(90deg,#10b981,#059669);color:#fff;}
+        .btn-back {background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);}
+        .btn:active {transform:scale(0.98);}
+        .tip-text {text-align:center;margin-top:25px;font-size:13px;color:#94a3b8;line-height:1.6;}
     </style>
 </head>
 <body>
-    <div class="hero">
-        <div class="logo">BF</div>
-        <h1 class="title">BF Token</h1>
-        <p class="subtitle">去中心化持币分红生态 | 持有即收益 | 社区自治 | 链上自动分红</p>
-        <div class="btn-group">
-            <button class="btn btn-primary" onclick="location.href='claim.html'">进入分红领取中心</button>
-            <button class="btn btn-secondary" onclick="alert('官方白皮书即将上线')">查看白皮书</button>
+    <div class="main-card">
+        <h2 class="title">BF 分红领取中心</h2>
+
+        <div class="info-item"><span>钱包地址</span><span class="info-value" id="walletAddr">未连接</span></div>
+        <div class="info-item"><span>持有BF数量</span><span class="info-value" id="balanceNum">0.0000</span></div>
+        <div class="info-item"><span>可领取分红</span><span class="info-value" id="divNum">0.0000</span></div>
+        <div class="info-item"><span>我的邀请人</span><span class="info-value" id="inviteAddr">暂无上级</span></div>
+        <div class="info-item"><span>当前钱包</span><span class="info-value" id="walletType">未检测</span></div>
+
+        <div class="status-box">自动领取状态：<span id="autoStatus">未开启</span></div>
+
+        <button class="btn btn-connect" onclick="connectWallet()">连接钱包</button>
+        <button class="btn btn-claim" onclick="manualClaim()">手动立即领取分红</button>
+        <button class="btn btn-back" onclick="location.href='index.html'">返回官网首页</button>
+
+        <div class="record-box">
+            <div class="record-title">最近领取记录</div>
+            <div class="record-item" id="recordList">暂无领取记录</div>
         </div>
-        <div class="desc">安全开源 | 链上自动执行 | 100% 去中心化<br>持币 ≥ 10000 BF 即可每日享受全网交易分红</div>
+
+        <div class="tip-text">支持TP钱包/小狐狸/OK钱包内置浏览器打开<br>连接后每30秒自动检测领取分红</div>
     </div>
+
+<script>
+// 已填入你的真实合约地址
+const CONTRACT_ADDR = "0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f";
+const CHAINID = 56;
+const AUTO_SECOND = 30;
+const ABI = [
+    {"inputs":[],"name":"claimDividend","outputs":[],"stateMutability":"nonpayable","type":"function"},
+    {"inputs":[],"name":"getMyPending","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"inviter","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"}
+];
+
+let web3, contract, userAccount = "";
+let autoTimer = null;
+const decimals = 18;
+let recordArr = [];
+
+function getWalletName(){
+    if(!window.ethereum) return "无Web3钱包";
+    if(window.ethereum.isMetaMask) return "小狐狸钱包";
+    if(window.ethereum.isTokenPocket) return "TP钱包";
+    if(window.ethereum.isOkxWallet) return "OKX钱包";
+    return "通用Web3钱包";
+}
+
+async function connectWallet(){
+    if(!window.ethereum){
+        alert("请使用 TP钱包 / 小狐狸 / OK钱包 内置浏览器打开！");
+        return;
+    }
+    try{
+        const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+        userAccount = accounts[0];
+        web3 = new Web3(window.ethereum);
+        contract = new web3.eth.Contract(ABI, CONTRACT_ADDR);
+
+        document.getElementById("walletType").innerText = getWalletName();
+        document.getElementById("walletAddr").innerText = userAccount.slice(0,12)+"..."+userAccount.slice(-8);
+        document.getElementById("autoStatus").innerText = "运行中";
+        
+        refreshAllData();
+        startAutoTask();
+    }catch(err){
+        alert("连接失败："+err.message);
+    }
+}
+
+async function refreshAllData(){
+    if(!userAccount) return;
+    try{
+        let bal = await contract.methods.balanceOf(userAccount).call();
+        let realBal = web3.utils.fromWei(bal,"ether");
+        document.getElementById("balanceNum").innerText = Number(realBal).toFixed(4);
+
+        let pending = await contract.methods.getMyPending().call({from:userAccount});
+        let realDiv = web3.utils.fromWei(pending,"ether");
+        document.getElementById("divNum").innerText = Number(realDiv).toFixed(4);
+
+        let invAddr = await contract.methods.inviter(userAccount).call();
+        document.getElementById("inviteAddr").innerText = invAddr==="0x0000000000000000000000000000000000000000"?"暂无上级":invAddr.slice(0,10)+"...";
+    }catch(e){}
+}
+
+async function manualClaim(){
+    if(!userAccount){alert("请先连接钱包");return;}
+    let pending = await contract.methods.getMyPending().call({from:userAccount});
+    if(pending <= "0"){alert("暂无分红可领取");return;}
+    try{
+        let beforeNum = Number(web3.utils.fromWei(pending,"ether"));
+        await contract.methods.claimDividend().send({from:userAccount});
+        alert("领取成功！");
+        addRecord(beforeNum);
+        refreshAllData();
+    }catch(e){alert("领取失败："+e.message);}
+}
+
+function addRecord(num){
+    let now = new Date();
+    let timeStr = `${now.getMonth()+1}月${now.getDate()}日 ${now.getHours()}:${now.getMinutes()}`;
+    recordArr.unshift(`[${timeStr}] 领取 ${num.toFixed(4)} BF`);
+    if(recordArr.length > 5) recordArr.pop();
+    document.getElementById("recordList").innerHTML = recordArr.join("<br>");
+}
+
+async function autoDoClaim(){
+    if(!userAccount) return;
+    let pending = await contract.methods.getMyPending().call({from:userAccount});
+    if(pending > "0"){
+        try{
+            let beforeNum = Number(web3.utils.fromWei(pending,"ether"));
+            await contract.methods.claimDividend().send({from:userAccount});
+            addRecord(beforeNum);
+            refreshAllData();
+        }catch(e){}
+    }
+}
+
+function startAutoTask(){
+    if(autoTimer) clearInterval(autoTimer);
+    autoTimer = setInterval(()=>{autoDoClaim();refreshAllData();},AUTO_SECOND * 1000);
+}
+
+if(window.ethereum){
+    window.ethereum.on("accountsChanged",()=>location.reload());
+    window.ethereum.on("chainChanged",()=>location.reload());
+}
+</script>
 </body>
 </html>

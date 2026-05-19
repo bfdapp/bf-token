@@ -3,352 +3,182 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>BF 双向链上兑换</title>
-<link rel="icon" href="favicon.ico">
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<title>BNB ↔ BF 兑换</title>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
 <style>
-*{margin:0;padding:0;box-sizing:border-box;}
-body{
-    background:#0b1224;
-    padding:25px 16px;
-    font-family:Microsoft Yahei,sans-serif;
-}
-.trade-container{
-    max-width:480px;
-    margin:0 auto;
-}
-.trade-tit{
-    text-align:center;
-    font-size:18px;
-    color:#ffd250;
-    font-weight:600;
-    margin-bottom:20px;
-}
-.tab-box{
-    display:flex;
-    gap:8px;
-    margin-bottom:15px;
-}
-.tab-item{
-    flex:1;
-    text-align:center;
-    padding:12px 0;
-    border-radius:10px;
-    background:#161e33;
-    color:#999;
-    font-size:15px;
-    cursor:pointer;
-}
-.tab-item.active{
-    background:linear-gradient(90deg,#27c707,#1a9c5c);
-    color:#fff;
-}
-.swap-box{
-    background:rgba(255,255,255,0.08);
-    border-radius:16px;
-    padding:20px;
-    border:1px solid rgba(255,210,80,0.2);
-}
-.input-item{
-    margin-bottom:15px;
-}
-.input-item label{
-    display:block;
-    color:#ccc;
-    font-size:14px;
-    margin-bottom:6px;
-}
-.input-item input{
-    width:100%;
-    padding:14px;
-    border-radius:10px;
-    border:none;
-    background:#161e33;
-    color:#fff;
-    font-size:15px;
-    outline:none;
-}
-.swap-btn{
-    width:100%;
-    padding:15px;
-    border:none;
-    border-radius:10px;
-    background:linear-gradient(90deg,#27c707,#1a9c5c);
-    color:#fff;
-    font-size:16px;
-    font-weight:bold;
-    cursor:pointer;
-    margin-top:10px;
-}
-.wallet-btn{
-    width:100%;
-    padding:13px;
-    border:none;
-    border-radius:10px;
-    background:linear-gradient(90deg,#407bff,#2554d1);
-    color:#fff;
-    font-size:15px;
-    cursor:pointer;
-    margin-bottom:10px;
-}
-.status{
-    text-align:center;
-    font-size:13px;
-    color:#94a3b8;
-    margin:12px 0;
-}
-.balance-box{
-    background:rgba(255,210,80,0.1);
-    border-radius:10px;
-    padding:10px;
-    text-align:center;
-    font-size:14px;
-    color:#eee;
-    margin-bottom:15px;
-}
-.price-box{
-    text-align:center;
-    color:#ffd250;
-    margin-bottom:10px;
-    font-size:14px;
-}
-.hide{display:none;}
+*{margin:0;padding:0;box-sizing:border-box;font-family:system-ui}
+body{background:#121212;color:#fff;padding:30px}
+.container{max-width:480px;margin:0 auto}
+h2{text-align:center;margin-bottom:20px;color:#ffc800}
+.btn-wallet{width:100%;padding:14px;border-radius:12px;background:#4d6eff;color:#fff;font-size:16px;border:none;margin-bottom:15px}
+.price{text-align:center;color:#ffc800;margin:10px 0}
+.balance{background:#1e1e1e;padding:12px;border-radius:12px;text-align:center;margin-bottom:15px}
+.tabs{display:flex;gap:10px;margin-bottom:15px}
+.tab{flex:1;padding:12px;border-radius:12px;background:#2a2a2a;text-align:center;cursor:pointer}
+.tab.active{background:#4d6eff}
+.panel{background:#1e1e1e;padding:20px;border-radius:16px}
+input{width:100%;padding:14px;margin:10px 0;border-radius:12px;background:#2a2a2a;color:#fff;border:none;font-size:16px}
+.btn-swap{width:100%;padding:15px;border-radius:12px;background:#4d6eff;color:#fff;font-size:16px;border:none;margin-top:10px}
+.hide{display:none}
 </style>
 </head>
 <body>
-<div class="trade-container">
-    <h3 class="trade-tit">BNB ↔ BF 双向链上兑换</h3>
+<div class="container">
+  <h2>BNB ↔ BF 兑换</h2>
+  <button class="btn-wallet" id="connect">连接钱包</button>
+  <div class="price" id="price">加载价格...</div>
+  <div class="balance" id="balance" style="display:none">
+    BNB: <span id="bnb">0.0000</span> &nbsp;|&nbsp; BF: <span id="bf">0.000</span>
+  </div>
 
-    <button class="wallet-btn" id="connectBtn">连接BSC钱包</button>
-    <div class="status" id="walletStatus">未连接钱包</div>
+  <div class="tabs">
+    <div class="tab active" id="tabBuy">买入 BF</div>
+    <div class="tab" id="tabSell">卖出 BF</div>
+  </div>
 
-    <div class="balance-box" id="balanceBox" style="display:none;">
-        BNB余额：<span id="bnbBalance">0.0000</span> &nbsp;&nbsp;
-        BF余额：<span id="bfBalance">0.00</span>
-    </div>
+  <div class="panel" id="buyPanel">
+    <input id="buyIn" placeholder="BNB 数量" type="number" step="0.0001">
+    <input id="buyOut" placeholder="获得 BF" readonly>
+    <button class="btn-swap" id="btnBuy">买入 BF</button>
+  </div>
 
-    <div class="price-box" id="realPrice">实时价格：加载中...</div>
-
-    <div class="tab-box">
-        <div class="tab-item active" id="buyTab">BNB买BF</div>
-        <div class="tab-item" id="sellTab">BF卖BNB</div>
-    </div>
-
-    <div class="swap-box" id="buyBox">
-        <div class="input-item">
-            <label>支付 BNB 数量</label>
-            <input type="number" id="payBnb" placeholder="输入BNB数量" min="0" step="0.0001">
-        </div>
-        <div class="input-item">
-            <label>预估获得 BF</label>
-            <input type="text" id="getBf" placeholder="自动计算" readonly>
-        </div>
-        <button class="swap-btn" id="buyBtn">确认买入BF</button>
-    </div>
-
-    <div class="swap-box hide" id="sellBox">
-        <div class="input-item">
-            <label>卖出 BF 数量</label>
-            <input type="number" id="payBf" placeholder="输入BF数量" min="0" step="0.0001">
-        </div>
-        <div class="input-item">
-            <label>预估获得 BNB</label>
-            <input type="text" id="getBnb" placeholder="自动计算" readonly>
-        </div>
-        <button class="swap-btn" id="sellBtn">确认卖出BF</button>
-    </div>
+  <div class="panel hide" id="sellPanel">
+    <input id="sellIn" placeholder="BF 数量" type="number" step="0.0001">
+    <input id="sellOut" placeholder="获得 BNB" readonly>
+    <button class="btn-swap" id="btnSell">卖出 BF</button>
+  </div>
 </div>
 
 <script>
-const BSC_CHAIN_ID = 56;
-const BSC_HEX = "0x38";
-const BF_TOKEN = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
-const ROUTER_ADDR = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
-const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const RPC = "https://bsc.publicnode.com";
+const BSC = 56;
+const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
+const BF = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
+const ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const SLIPPAGE = 0.75;
 
-let provider, signer, router, bfContract;
-const readProvider = new ethers.providers.JsonRpcProvider(RPC, BSC_CHAIN_ID);
+const readProvider = new ethers.providers.JsonRpcProvider(RPC, BSC);
+let provider, signer, user, routerContract;
 
-const connectBtn = document.getElementById("connectBtn");
-const walletStatus = document.getElementById("walletStatus");
-const balanceBox = document.getElementById("balanceBox");
-const bnbBalance = document.getElementById("bnbBalance");
-const bfBalance = document.getElementById("bfBalance");
-const realPrice = document.getElementById("realPrice");
-const payBnb = document.getElementById("payBnb");
-const getBf = document.getElementById("getBf");
-const payBf = document.getElementById("payBf");
-const getBnb = document.getElementById("getBnb");
-const buyBtn = document.getElementById("buyBtn");
-const sellBtn = document.getElementById("sellBtn");
-const buyTab = document.getElementById("buyTab");
-const sellTab = document.getElementById("sellTab");
-const buyBox = document.getElementById("buyBox");
-const sellBox = document.getElementById("sellBox");
-
-const ROUTER_ABI = [
-    "function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)",
-    "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)",
-    "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)"
+const routerAbi = [
+  "function getAmountsOut(uint,address[]) view returns (uint[])",
+  "function swapExactETHForTokens(uint,address[],address,uint) payable returns (uint[])",
+  "function swapExactTokensForETH(uint,uint,address[],address,uint) returns (uint[])"
 ];
+const bep20Abi = ["function approve(address,uint) returns (bool)", "function balanceOf(address) view returns (uint)"];
 
-const BEP20_ABI = [
-    "function balanceOf(address) external view returns (uint)",
-    "function approve(address spender, uint value) external returns (bool)"
-];
-
-buyTab.onclick = () => {
-    buyTab.classList.add("active");
-    sellTab.classList.remove("active");
-    buyBox.classList.remove("hide");
-    sellBox.classList.add("hide");
-};
-sellTab.onclick = () => {
-    sellTab.classList.add("active");
-    buyTab.classList.remove("active");
-    sellBox.classList.remove("hide");
-    buyBox.classList.add("hide");
-};
-
-async function switchBSC() {
-    try {
-        await window.ethereum.request({
-            method: "wallet_addEthereumChain",
-            params: [{
-                chainId: BSC_HEX,
-                chainName: "BSC",
-                nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
-                rpcUrls: [RPC],
-                blockExplorerUrls: ["https://bscscan.com"]
-            }]
-        });
-    } catch (e) {}
+async function switchChain() {
+  try {
+    await window.ethereum.request({
+      method: "wallet_addEthereumChain",
+      params: [{ chainId: "0x38", chainName: "BSC", nativeCurrency: { symbol: "BNB", decimals: 18 }, rpcUrls: [RPC] }]
+    });
+  } catch { }
 }
 
-async function getQuote(amountIn, path) {
-    try {
-        const r = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, readProvider);
-        const amt = ethers.utils.parseEther(amountIn.toString());
-        const out = await r.getAmountsOut(amt, path);
-        return ethers.utils.formatUnits(out[1], 18);
-    } catch (e) {
-        return "0";
-    }
+async function quote(amt, path) {
+  try {
+    const r = new ethers.Contract(ROUTER, routerAbi, readProvider);
+    const out = await r.getAmountsOut(ethers.utils.parseEther(amt.toString()), path);
+    return ethers.utils.formatUnits(out[1], 18);
+  } catch { return "0"; }
 }
 
-async function refreshPrice() {
-    const out = await getQuote(1, [WBNB, BF_TOKEN]);
-    realPrice.innerText = `实时价格：1 BNB = ${parseFloat(out).toFixed(2)} BF`;
+async function loadBalance() {
+  if (!user) return;
+  const bnb = await readProvider.getBalance(user);
+  const bf = await new ethers.Contract(BF, bep20Abi, readProvider).balanceOf(user);
+  document.getElementById("bnb").innerText = parseFloat(ethers.utils.formatEther(bnb)).toFixed(4);
+  document.getElementById("bf").innerText = parseFloat(ethers.utils.formatUnits(bf, 18)).toFixed(4);
+  document.getElementById("balance").style.display = "block";
 }
 
-payBnb.oninput = async () => {
-    const v = payBnb.value;
-    if (!v || v <= 0) { getBf.value = ""; return; }
-    getBf.value = parseFloat(await getQuote(v, [WBNB, BF_TOKEN])).toFixed(2);
-};
-
-payBf.oninput = async () => {
-    const v = payBf.value;
-    if (!v || v <= 0) { getBnb.value = ""; return; }
-    getBnb.value = parseFloat(await getQuote(v, [BF_TOKEN, WBNB])).toFixed(6);
-};
-
-async function loadBalances(addr) {
-    try {
-        const bnb = await readProvider.getBalance(addr);
-        const bf = await new ethers.Contract(BF_TOKEN, BEP20_ABI, readProvider).balanceOf(addr);
-        bnbBalance.innerText = ethers.utils.formatEther(bnb).slice(0, 6);
-        bfBalance.innerText = ethers.utils.formatUnits(bf, 18).slice(0, 5);
-        balanceBox.style.display = "block";
-    } catch (e) {}
+async function updatePrice() {
+  const p = await quote(1, [WBNB, BF]);
+  document.getElementById("price").innerText = `1 BNB = ${parseFloat(p).toFixed(2)} BF`;
 }
 
-connectBtn.onclick = async () => {
-    if (!window.ethereum) { alert("请安装钱包"); return; }
-    try {
-        await window.ethereum.request({ method: "eth_requestAccounts" });
-        await switchBSC();
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        signer = provider.getSigner();
-        const addr = await signer.getAddress();
-        walletStatus.innerText = `已连接：${addr.slice(0, 6)}...`;
-        router = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, signer);
-        bfContract = new ethers.Contract(BF_TOKEN, BEP20_ABI, signer);
-        loadBalances(addr);
-        refreshPrice();
-    } catch (e) {
-        alert("连接失败：" + e.message);
-    }
+document.getElementById("connect").onclick = async () => {
+  if (!window.ethereum) return alert("请安装钱包");
+  await switchChain();
+  await window.ethereum.request({ method: "eth_requestAccounts" });
+  provider = new ethers.providers.Web3Provider(window.ethereum);
+  signer = provider.getSigner();
+  user = await signer.getAddress();
+  routerContract = new ethers.Contract(ROUTER, routerAbi, signer);
+  document.getElementById("connect").innerText = "已连接";
+  loadBalance();
+  updatePrice();
 };
 
-buyBtn.onclick = async () => {
-    try {
-        if (!signer) { alert("请连接钱包"); return; }
-        const val = payBnb.value;
-        if (!val || val <= 0) { alert("输入数量"); return; }
-        buyBtn.innerText = "交易中...";
-        const out = await getQuote(val, [WBNB, BF_TOKEN]);
-        const minOut = ethers.utils.parseEther((out * SLIPPAGE).toFixed(6));
-        const tx = await router.swapExactETHForTokens(
-            minOut,
-            [WBNB, BF_TOKEN],
-            await signer.getAddress(),
-            Math.floor(Date.now() / 1000) + 600,
-            { value: ethers.utils.parseEther(val) }
-        );
-        alert("已提交：" + tx.hash);
-        await tx.wait();
-        alert("买入成功！");
-        loadBalances(await signer.getAddress());
-    } catch (e) {
-        alert("失败：" + e.message);
-    } finally {
-        buyBtn.innerText = "确认买入BF";
-    }
+document.getElementById("tabBuy").onclick = () => {
+  document.getElementById("tabBuy").classList.add("active");
+  document.getElementById("tabSell").classList.remove("active");
+  document.getElementById("buyPanel").classList.remove("hide");
+  document.getElementById("sellPanel").classList.add("hide");
+};
+document.getElementById("tabSell").onclick = () => {
+  document.getElementById("tabSell").classList.add("active");
+  document.getElementById("tabBuy").classList.remove("active");
+  document.getElementById("sellPanel").classList.remove("hide");
+  document.getElementById("buyPanel").classList.add("hide");
 };
 
-// ========== 卖出按钮 100% 正常版本 ==========
-sellBtn.onclick = async () => {
-    try {
-        if (!signer) { alert("请连接钱包"); return; }
-        const val = payBf.value;
-        if (!val || val <= 0) { alert("请输入卖出数量"); return; }
+document.getElementById("buyIn").oninput = async () => {
+  const v = document.getElementById("buyIn").value;
+  if (!v) return document.getElementById("buyOut").value = "";
+  document.getElementById("buyOut").value = parseFloat(await quote(v, [WBNB, BF])).toFixed(2);
+};
+document.getElementById("sellIn").oninput = async () => {
+  const v = document.getElementById("sellIn").value;
+  if (!v) return document.getElementById("sellOut").value = "";
+  document.getElementById("sellOut").value = parseFloat(await quote(v, [BF, WBNB])).toFixed(6);
+};
 
-        sellBtn.innerText = "授权中...";
-        const user = await signer.getAddress();
-        const amountIn = ethers.utils.parseUnits(val, 18);
+document.getElementById("btnBuy").onclick = async () => {
+  try {
+    const v = document.getElementById("buyIn").value;
+    if (!v) return alert("输入数量");
+    const out = await quote(v, [WBNB, BF]);
+    const minOut = ethers.utils.parseEther((out * SLIPPAGE).toFixed(6));
+    const tx = await routerContract.swapExactETHForTokens(
+      minOut, [WBNB, BF], user, Math.floor(Date.now()/1000)+600,
+      { value: ethers.utils.parseEther(v) }
+    );
+    alert("已提交：" + tx.hash);
+    await tx.wait();
+    alert("买入成功");
+    loadBalance();
+  } catch (e) { alert("失败：" + e.message); }
+};
 
-        // 授权
-        const approveTx = await bfContract.approve(ROUTER_ADDR, amountIn);
-        await approveTx.wait();
+document.getElementById("btnSell").onclick = async () => {
+  try {
+    const v = document.getElementById("sellIn").value;
+    if (!v) return alert("输入数量");
 
-        // 计算
-        const out = await getQuote(val, [BF_TOKEN, WBNB]);
-        const minOut = ethers.utils.parseEther((out * SLIPPAGE).toFixed(6));
+    // 价格
+    const out = await quote(v, [BF, WBNB]);
+    const minOut = ethers.utils.parseEther((out * SLIPPAGE).toFixed(6));
+    const amountIn = ethers.utils.parseUnits(v, 18);
 
-        sellBtn.innerText = "交易中...";
+    // 授权
+    const bfContract = new ethers.Contract(BF, bep20Abi, signer);
+    const approve = await bfContract.approve(ROUTER, amountIn);
+    await approve.wait();
 
-        // 卖出
-        const tx = await router.swapExactTokensForETH(
-            amountIn,
-            minOut,
-            [BF_TOKEN, WBNB],
-            user,
-            Math.floor(Date.now() / 1000) + 600
-        );
-
-        alert("交易已提交：" + tx.hash);
-        await tx.wait();
-        alert("卖出成功！");
-        loadBalances(user);
-
-    } catch (e) {
-        alert("卖出失败：" + e.message);
-    } finally {
-        sellBtn.innerText = "确认卖出BF";
-    }
+    // 卖出（100% 兼容所有钱包）
+    const tx = await routerContract.swapExactTokensForETH(
+      amountIn, minOut, [BF, WBNB], user, Math.floor(Date.now()/1000)+600
+    );
+    alert("已提交：" + tx.hash);
+    await tx.wait();
+    alert("卖出成功");
+    loadBalance();
+  } catch (e) {
+    alert("卖出失败：" + e.message);
+    console.error(e);
+  }
 };
 </script>
 </body>

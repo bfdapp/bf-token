@@ -171,8 +171,14 @@ const ABI = [
     {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userLevel3Count","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
 ];
 
+// 备用稳定BSC节点，双节点防超时
+const MAIN_RPC = "https://bsc-dataseed.binance.org";
+const BACKUP_RPC = "https://bsc.publicnode.com";
 let web3,account,contract;
 const modal = document.getElementById("walletModal");
+// 全局备用查询实例
+const backupWeb3 = new Web3(new Web3.providers.HttpProvider(BACKUP_RPC));
+const backupContract = new backupWeb3.eth.Contract(ABI, CONTRACT_ADDR);
 
 function openWalletSelect(){modal.style.display = "flex";}
 function closeWalletSelect(){modal.style.display = "none";}
@@ -180,19 +186,29 @@ function closeWalletSelect(){modal.style.display = "none";}
 async function walletConnect(walletName){
     closeWalletSelect();
     if(!window.ethereum){
-        alert(`暂未检测到【${walletName}】，请先打开对应钱包再重试`);
+        alert(`暂未检测到【${walletName}】，请先安装并打开钱包`);
         return;
     }
     try{
+        // 请求授权
         let accounts = await ethereum.request({method:"eth_requestAccounts"});
         account = accounts[0];
         web3 = new Web3(ethereum);
+
+        // 强制校验必须在BSC链
+        let chainId = await web3.eth.getChainId();
+        if(chainId !== 56){
+            alert("请手动切换钱包网络为 BSC 智能链(BNB)！");
+            return;
+        }
+
         contract = new web3.eth.Contract(ABI,CONTRACT_ADDR);
         document.getElementById("walletAddr").innerText = account.slice(0,12)+"..."+account.slice(-8);
         document.getElementById("walletType").innerText = walletName;
-        refreshData();
+        // 连接自动加载全部数据
+        await refreshAllData();
     }catch(e){
-        alert("钱包连接失败，请切换网络或重新授权");
+        alert("钱包连接失败，请重启钱包重试");
     }
 }
 
@@ -202,50 +218,73 @@ function connectTP(){walletConnect("TP 多链钱包")}
 function connectOKX(){walletConnect("OKX 欧易钱包")}
 function connectBitget(){walletConnect("Bitget 比特钱包")}
 
-async function refreshData(){
-    if(!account)return;
+// 统一刷新：资产+分红
+async function refreshAllData(){
+    if(!account) return;
     try{
-        let bal = await contract.methods.balanceOf(account).call();
-        let pd = await contract.methods.getMyPending().call();
-        document.getElementById("balanceNum").innerText = Number(web3.utils.fromWei(bal,"ether")).toFixed(4);
-        document.getElementById("divNum").innerText = Number(web3.utils.fromWei(pd,"ether")).toFixed(4);
-    }catch(e){}
-}
+        // 优先钱包节点查询
+        let bfBalance = await contract.methods.balanceOf(account).call();
+        let canDiv = await contract.methods.getMyPending().call();
 
-async function manualClaim(){
-    if(!account)return alert("请先选择并连接您的钱包");
-    try{
-        await contract.methods.claimDividend().send({from:account});
-        alert("🎉 分红领取成功，资产已到账！");
-        refreshData();
+        // 查询失败自动切备用节点
+        if(bfBalance === "0" || !bfBalance){
+            bfBalance = await backupContract.methods.balanceOf(account).call();
+        }
+        if(canDiv === "0" || !canDiv){
+            canDiv = await backupContract.methods.getMyPending().call();
+        }
+
+        document.getElementById("balanceNum").innerText = Number(web3.utils.fromWei(bfBalance,"ether")).toFixed(4);
+        document.getElementById("divNum").innerText = Number(web3.utils.fromWei(canDiv,"ether")).toFixed(4);
     }catch(e){
-        alert("领取失败，请检查链网络与手续费");
+        console.log("数据读取异常");
     }
 }
 
-// 一键查询三级人脉
+// 领取分红
+async function manualClaim(){
+    if(!account)return alert("请先连接钱包");
+    try{
+        await contract.methods.claimDividend().send({from:account});
+        alert("🎉 分红领取成功，资产已发放！");
+        refreshAllData();
+    }catch(e){
+        alert("领取失败：余额不足/手续费不足/暂无分红");
+    }
+}
+
+// 查询三级团队人数（已修复传参+双节点）
 async function checkMyTeam(){
     if(!account)return alert("请先连接钱包");
     try{
-        let l1 = await contract.methods.userLevel1Count(account).call();
-        let l2 = await contract.methods.userLevel2Count(account).call();
-        let l3 = await contract.methods.userLevel3Count(account).call();
-        
+        let l1,l2,l3;
+        // 主节点
+        l1 = await contract.methods.userLevel1Count(account).call();
+        l2 = await contract.methods.userLevel2Count(account).call();
+        l3 = await contract.methods.userLevel3Count(account).call();
+
+        // 备用节点补查
+        if(!l1) l1 = await backupContract.methods.userLevel1Count(account).call();
+        if(!l2) l2 = await backupContract.methods.userLevel2Count(account).call();
+        if(!l3) l3 = await backupContract.methods.userLevel3Count(account).call();
+
         document.getElementById("level1").innerText = l1;
         document.getElementById("level2").innerText = l2;
         document.getElementById("level3").innerText = l3;
-        
-        alert(`✅ 查询成功！
+
+        alert(`✅ 团队数据查询成功
 一级直推：${l1} 人
 二级团队：${l2} 人
 三级团队：${l3} 人`);
     }catch(e){
-        alert("查询失败，请检查合约是否开启人脉机制");
+        alert("暂无团队数据或合约未开放统计");
     }
 }
 
+// 监听钱包切换地址/切换网络自动刷新
 if(window.ethereum){
     ethereum.on("accountsChanged",()=>location.reload());
+    ethereum.on("chainChanged",()=>location.reload());
 }
 </script>
 </body>

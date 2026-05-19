@@ -132,8 +132,14 @@
         <div class="info-item"><span>当前可领分红</span><span class="info-value" id="divNum">0.0000</span></div>
         <div class="info-item"><span>已接入钱包</span><span class="info-value" id="walletType">暂无</span></div>
 
+        <!-- 一键查询三级人脉 -->
+        <div class="info-item"><span>一级直推人数</span><span class="info-value" id="level1">0</span></div>
+        <div class="info-item"><span>二级团队人数</span><span class="info-value" id="level2">0</span></div>
+        <div class="info-item"><span>三级团队人数</span><span class="info-value" id="level3">0</span></div>
+
         <button class="btn btn-connect" onclick="openWalletSelect()">选择钱包连接</button>
         <button class="btn btn-claim" onclick="manualClaim()">一键领取分红</button>
+        <button class="btn btn-connect" onclick="checkMyTeam()">一键查询我的团队</button>
         <button class="btn btn-back" onclick="location.href='index.html'">返回官方首页</button>
 
         <div class="tip-text">
@@ -159,7 +165,10 @@ const CONTRACT_ADDR = "0x3f3ad0542415f58d7972ad9e1bd9e51093df0e8f";
 const ABI = [
     {"inputs":[],"name":"claimDividend","outputs":[],"stateMutability":"nonpayable","type":"function"},
     {"inputs":[],"name":"getMyPending","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+    {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userLevel1Count","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userLevel2Count","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userLevel3Count","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
 ];
 
 let web3,account,contract;
@@ -211,6 +220,27 @@ async function manualClaim(){
         refreshData();
     }catch(e){
         alert("领取失败，请检查链网络与手续费");
+    }
+}
+
+// 一键查询三级人脉
+async function checkMyTeam(){
+    if(!account)return alert("请先连接钱包");
+    try{
+        let l1 = await contract.methods.userLevel1Count(account).call();
+        let l2 = await contract.methods.userLevel2Count(account).call();
+        let l3 = await contract.methods.userLevel3Count(account).call();
+        
+        document.getElementById("level1").innerText = l1;
+        document.getElementById("level2").innerText = l2;
+        document.getElementById("level3").innerText = l3;
+        
+        alert(`✅ 查询成功！
+一级直推：${l1} 人
+二级团队：${l2} 人
+三级团队：${l3} 人`);
+    }catch(e){
+        alert("查询失败，请检查合约是否开启人脉机制");
     }
 }
 

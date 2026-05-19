@@ -45,8 +45,61 @@ body{
     font-size:14px;
     color:#94a3b8;
     line-height:1.6;
-    margin-bottom:50px;
+    margin-bottom:20px;
 }
+
+/* ========== 合约地址展示 + 复制按钮 ========== */
+.contract-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.06);
+    padding: 12px 16px;
+    border-radius: 12px;
+    margin-bottom: 40px;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.contract-addr {
+    font-size: 13px;
+    color: #e2e8f0;
+    word-break: break-all;
+    line-height: 1.4;
+}
+.copy-btn {
+    width: 32px;
+    height: 32px;
+    background: #407bff;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    border: none;
+}
+.copy-btn:hover {
+    background: #2554d1;
+}
+.copy-btn svg {
+    width: 16px;
+    height: 16px;
+    fill: #fff;
+}
+.copy-tips {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    z-index: 999;
+    display: none;
+}
+
 .btn-box{
     display:flex;
     flex-direction:column;
@@ -82,6 +135,16 @@ body{
     <h1 class="main-title">BF 生态官方平台</h1>
     <p class="main-desc">一站式链上交易 ｜ 持仓享生态分红权益</p>
 
+    <!-- ========== 合约地址 + 一键复制 ========== -->
+    <div class="contract-row">
+        <div class="contract-addr" id="ca">0x31ecC30e91A18dD1eCcCA041e3E1Ecd57c522340</div>
+        <button class="copy-btn" onclick="copyCA()">
+            <svg viewBox="0 0 24 24">
+                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+        </button>
+    </div>
+
     <div class="btn-box">
         <button class="home-btn btn-trade" onclick="location.href='trade.html'">币币交易中心</button>
         <button class="home-btn btn-div" onclick="window.open('claim.html')">分红领取中心</button>
@@ -89,5 +152,33 @@ body{
 
     <p class="tip-text">温馨提示：国内网络无需加速器，支持主流钱包直接连接交易</p>
 </div>
+
+<!-- 复制成功提示 -->
+<div class="copy-tips" id="copyTips">合约地址复制成功</div>
+
+<script>
+function copyCA(){
+    let ca = document.getElementById('ca').innerText.trim();
+    navigator.clipboard.writeText(ca).then(()=>{
+        showTips();
+    }).catch(()=>{
+        let input = document.createElement('input');
+        input.value = ca;
+        document.body.appendChild(input);
+        input.select();
+        document.execCommand('Copy');
+        document.body.removeChild(input);
+        showTips();
+    })
+}
+function showTips(){
+    let t = document.getElementById('copyTips');
+    t.style.display = 'block';
+    setTimeout(()=>{
+        t.style.display = 'none';
+    },1500);
+}
+</script>
+
 </body>
 </html>

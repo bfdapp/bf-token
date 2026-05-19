@@ -98,7 +98,7 @@ body{
     margin:12px 0;
 }
 .balance-box{
-    background:rgba(255,255,255,0.05);
+    background:rgba(255,210,80,0.1);
     border-radius:10px;
     padding:10px;
     text-align:center;
@@ -172,7 +172,7 @@ body{
     </div>
 
     <div class="tips">
-        须知：自动添加切换BSC币安智能链，国内普通网络直连无需加速器，交易采用薄饼官方路由。税费18%，滑点已设20%。
+        须知：自动切换BSC链，无需加速器，全钱包兼容，税费18%已适配高滑点
     </div>
 
     <a href="index.html" class="back-btn">← 返回官方首页</a>
@@ -182,13 +182,17 @@ body{
 // 全局配置
 const BSC_CHAIN_ID_NUM = 56;
 const BSC_CHAIN_ID_HEX = "0x38";
+// 国内免翻墙BSC节点（核心解决无梯子Bitget）
+const FREE_BSC_RPC = "https://bsc.publicnode.com";
 const BF_TOKEN = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
 const PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const SWAP_RATE = 1200;
-const SLIPPAGE = 0.8; // 20%滑点
+const SLIPPAGE = 0.8; // 20%滑点适配18%交易税
 
 let provider, signer, routerContract, bfContract;
+// 全局备用节点查询器
+let freeRpcProvider = new ethers.providers.JsonRpcProvider(FREE_BSC_RPC,56);
 
 // DOM
 const connectBtn = document.getElementById("connectBtn");
@@ -234,12 +238,11 @@ sellTab.onclick = ()=>{
     buyBox.classList.add("hide");
 }
 
-// 买入实时计算
+// 实时换算
 payBnb.addEventListener("input",()=>{
     let v = Number(payBnb.value)||0;
     getBf.value = (v * SWAP_RATE).toFixed(2);
 })
-// 卖出实时计算
 payBf.addEventListener("input",()=>{
     let v = Number(payBf.value)||0;
     getBnb.value = (v / SWAP_RATE).toFixed(6);
@@ -254,156 +257,121 @@ async function switchBSC() {
                 chainId: BSC_CHAIN_ID_HEX,
                 chainName: "Binance Smart Chain",
                 nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
-                rpcUrls: ["https://bsc-dataseed1.binance.org"],
+                rpcUrls: [FREE_BSC_RPC],
                 blockExplorerUrls: ["https://bscscan.com"]
             }]
         });
-    }catch(e){
-        console.error("切换BSC失败",e);
-    }
+    }catch(e){}
 }
 
-// 刷新余额（兼容Bitget：重试+降级）
-async function refreshBalances(address) {
-    try {
-        // BNB余额
-        const bnbWei = await provider.getBalance(address);
-        bnbBalance.innerText = ethers.utils.formatEther(bnbWei).slice(0,6);
-
-        // BF余额（硬写死decimals=18）
-        const bfWei = await bfContract.balanceOf(address);
-        bfBalance.innerText = ethers.utils.formatUnits(bfWei, 18).slice(0,5);
-
-        balanceBox.style.display = "block";
-    } catch (e) {
-        console.error("刷新余额失败（重试一次）", e);
-        // 重试一次
-        try {
-            const bnbWei = await provider.getBalance(address);
-            bnbBalance.innerText = ethers.utils.formatEther(bnbWei).slice(0,6);
-            const bfWei = await bfContract.balanceOf(address);
-            bfBalance.innerText = ethers.utils.formatUnits(bfWei, 18).slice(0,5);
-            balanceBox.style.display = "block";
-        } catch (e2) {
-            console.error("重试仍失败", e2);
-            balanceBox.style.display = "none";
-        }
+// 余额查询：优先钱包节点，失败直接用国内免费节点（完美兼容Bitget）
+async function refreshBalances(walletAddr) {
+    let bnbNum,bfNum;
+    try{
+        // 优先钱包自身节点
+        let bnbWei = await provider.getBalance(walletAddr);
+        let bfWei = await bfContract.balanceOf(walletAddr);
+        bnbNum = ethers.utils.formatEther(bnbWei);
+        bfNum = ethers.utils.formatUnits(bfWei,18);
+    }catch(err){
+        // 钱包节点被墙，强制用国内免翻墙节点
+        let bnbWei = await freeRpcProvider.getBalance(walletAddr);
+        let bfCon = new ethers.Contract(BF_TOKEN,TOKEN_ABI,freeRpcProvider);
+        let bfWei = await bfCon.balanceOf(walletAddr);
+        bnbNum = ethers.utils.formatEther(bnbWei);
+        bfNum = ethers.utils.formatUnits(bfWei,18);
     }
+    bnbBalance.innerText = bnbNum.slice(0,6);
+    bfBalance.innerText = bfNum.slice(0,5);
+    balanceBox.style.display = "block";
 }
 
-// 连接钱包（兼容Bitget chainId 字符串/数字）
+// 连接钱包
 connectBtn.addEventListener("click",async ()=>{
     if(!window.ethereum){
-        alert("请安装MetaMask/TP钱包等Web3钱包");
+        alert("请安装TP/Bitget/小狐狸钱包");
         return;
     }
     try{
-        const accounts = await window.ethereum.request({method:"eth_requestAccounts"});
+        await window.ethereum.request({method:"eth_requestAccounts"});
         await switchBSC();
         provider = new ethers.providers.Web3Provider(window.ethereum);
         signer = provider.getSigner();
-        const net = await provider.getNetwork();
-
-        // 兼容：数字56 或 字符串"0x38"
-        const isBSC = net.chainId === BSC_CHAIN_ID_NUM || net.chainId === BSC_CHAIN_ID_HEX;
-        if(!isBSC){
-            walletStatus.innerText = "请手动切换至BSC智能链";
+        let net = await provider.getNetwork();
+        let isBsc = net.chainId === BSC_CHAIN_ID_NUM || net.chainId === BSC_CHAIN_ID_HEX;
+        if(!isBsc){
+            walletStatus.innerText = "请切换至BSC币安智能链";
             balanceBox.style.display = "none";
             return;
         }
-        routerContract = new ethers.Contract(PANCAKE_ROUTER, ROUTER_ABI, signer);
-        bfContract = new ethers.Contract(BF_TOKEN, TOKEN_ABI, signer);
-        const addr = await signer.getAddress();
+        routerContract = new ethers.Contract(PANCAKE_ROUTER,ROUTER_ABI,signer);
+        bfContract = new ethers.Contract(BF_TOKEN,TOKEN_ABI,signer);
+        let addr = await signer.getAddress();
         walletStatus.innerText = `已连接: ${addr.slice(0,6)}...${addr.slice(-4)}`;
-        
-        // Bitget 不触发事件 → 连接后强制刷新一次
         await refreshBalances(addr);
     }catch(e){
         walletStatus.innerText = "连接失败";
         balanceBox.style.display = "none";
-        console.error(e);
     }
 })
 
-// 钱包账户/网络变化（仅作兜底，Bitget不一定触发）
-if (window.ethereum) {
-    window.ethereum.on("accountsChanged", async (accounts) => {
-        if (accounts.length && signer) {
-            await refreshBalances(accounts[0]);
-        } else {
-            balanceBox.style.display = "none";
-        }
-    });
-    window.ethereum.on("chainChanged", async () => {
-        if (signer) {
-            const addr = await signer.getAddress();
-            await refreshBalances(addr);
-        }
+// 账户切换自动刷新余额
+if(window.ethereum){
+    window.ethereum.on("accountsChanged",async (accs)=>{
+        if(accs.length&&signer) refreshBalances(accs[0]);
+        else balanceBox.style.display="none";
     });
 }
 
 // BNB买入BF
 buyBtn.addEventListener("click",async ()=>{
     if(!signer) return alert("请先连接钱包");
-    let bnbVal = Number(payBnb.value);
-    if(!bnbVal||bnbVal<=0) return alert("请输入正确BNB数量");
-
-    buyBtn.innerText = "交易发起中...";
+    let num = Number(payBnb.value);
+    if(!num||num<=0) return alert("请输入正确BNB数量");
+    buyBtn.innerText="交易提交中...";
     try{
-        const value = ethers.utils.parseEther(bnbVal.toString());
-        const minReceive = ethers.utils.parseEther((bnbVal * SWAP_RATE * SLIPPAGE).toFixed(6));
-        const path = [WBNB, BF_TOKEN];
-        const userAddr = await signer.getAddress();
-        const deadline = Math.floor(Date.now()/1000)+600;
-
-        const tx = await routerContract.swapExactETHForTokens(
-            minReceive,path,userAddr,deadline,{value:value}
-        );
-        alert(`买入交易已提交!\n交易哈希:${tx.hash}`);
+        let val = ethers.utils.parseEther(num.toString());
+        let minGet = ethers.utils.parseEther((num*SWAP_RATE*SLIPPAGE).toFixed(6));
+        let user = await signer.getAddress();
+        let deadline = Math.floor(Date.now()/1000)+600;
+        let tx = await routerContract.swapExactETHForTokens(minGet,[WBNB,BF_TOKEN],user,deadline,{value:val});
+        alert(`交易已提交\n哈希：${tx.hash}`);
         await tx.wait();
-        alert("买入成功，BF已到账！");
-        await refreshBalances(userAddr);
+        alert("买入成功，代币已到账！");
+        refreshBalances(user);
     }catch(e){
         if(e.message.includes("insufficient funds")) alert("BNB余额不足");
-        else alert("交易失败："+e.message.substr(0,50));
-        console.error(e);
+        else alert("交易失败，请检查数量与滑点");
     }
-    buyBtn.innerText = "确认买入BF";
+    buyBtn.innerText="确认买入BF";
 })
 
 // BF卖出换BNB
 sellBtn.addEventListener("click",async ()=>{
     if(!signer) return alert("请先连接钱包");
-    let bfVal = Number(payBf.value);
-    if(!bfVal||bfVal<=0) return alert("请输入正确BF数量");
-
-    sellBtn.innerText = "授权并卖出中...";
+    let num = Number(payBf.value);
+    if(!num||num<=0) return alert("请输入正确BF数量");
+    sellBtn.innerText="授权卖出中...";
     try{
-        const userAddr = await signer.getAddress();
-        const sellAmount = ethers.utils.parseUnits(bfVal.toString(),18);
-        const expectBnb = bfVal / SWAP_RATE;
-        const minBnb = ethers.utils.parseEther((expectBnb * SLIPPAGE).toFixed(6));
-        const path = [BF_TOKEN, WBNB];
-        const deadline = Math.floor(Date.now()/1000)+600;
-
-        // 先授权路由使用BF
-        let allowanceTx = await bfContract.approve(PANCAKE_ROUTER,sellAmount);
-        await allowanceTx.wait();
-
-        // 执行卖出兑换
-        const tx = await routerContract.swapExactTokensForETH(
-            sellAmount,minBnb,path,userAddr,deadline
-        );
-        alert(`卖出交易已提交!\n交易哈希:${tx.hash}`);
+        let user = await signer.getAddress();
+        let sellAmount = ethers.utils.parseUnits(num.toString(),18);
+        let expectBnb = num/SWAP_RATE;
+        let minOut = ethers.utils.parseEther((expectBnb*SLIPPAGE).toFixed(6));
+        let deadline = Math.floor(Date.now()/1000)+600;
+        // 授权
+        let appTx = await bfContract.approve(PANCAKE_ROUTER,sellAmount);
+        await appTx.wait();
+        // 交易
+        let tx = await routerContract.swapExactTokensForETH(sellAmount,minOut,[BF_TOKEN,WBNB],user,deadline);
+        alert(`交易已提交\n哈希：${tx.hash}`);
         await tx.wait();
         alert("卖出成功，BNB已到账！");
-        await refreshBalances(userAddr);
+        refreshBalances(user);
     }catch(e){
         if(e.message.includes("allowance")) alert("授权失败，请重试");
-        else alert("交易失败："+e.message.substr(0,50));
-        console.error(e);
+        else alert("交易失败，请稍后重试");
     }
-    sellBtn.innerText = "确认卖出换BNB";
+    sellBtn.innerText="确认卖出换BNB";
 })
 </script>
 </body>

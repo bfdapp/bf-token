@@ -180,12 +180,13 @@ body{
 
 <script>
 // 全局配置
-const BSC_CHAIN_ID = 56;
+const BSC_CHAIN_ID_NUM = 56;
+const BSC_CHAIN_ID_HEX = "0x38";
 const BF_TOKEN = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
 const PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const SWAP_RATE = 1200;
-const SLIPPAGE = 0.8; // 20%滑点，适配18%税
+const SLIPPAGE = 0.8; // 20%滑点
 
 let provider, signer, routerContract, bfContract;
 
@@ -250,7 +251,7 @@ async function switchBSC() {
         await window.ethereum.request({
             method: "wallet_addEthereumChain",
             params: [{
-                chainId: "0x38",
+                chainId: BSC_CHAIN_ID_HEX,
                 chainName: "Binance Smart Chain",
                 nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
                 rpcUrls: ["https://bsc-dataseed1.binance.org"],
@@ -262,39 +263,50 @@ async function switchBSC() {
     }
 }
 
-// 刷新余额（修复版）
+// 刷新余额（兼容Bitget：重试+降级）
 async function refreshBalances(address) {
     try {
         // BNB余额
         const bnbWei = await provider.getBalance(address);
         bnbBalance.innerText = ethers.utils.formatEther(bnbWei).slice(0,6);
 
-        // BF余额（硬写死decimals=18，避免调用失败）
+        // BF余额（硬写死decimals=18）
         const bfWei = await bfContract.balanceOf(address);
         bfBalance.innerText = ethers.utils.formatUnits(bfWei, 18).slice(0,5);
 
         balanceBox.style.display = "block";
     } catch (e) {
-        console.error("刷新余额失败", e);
-        balanceBox.style.display = "none";
+        console.error("刷新余额失败（重试一次）", e);
+        // 重试一次
+        try {
+            const bnbWei = await provider.getBalance(address);
+            bnbBalance.innerText = ethers.utils.formatEther(bnbWei).slice(0,6);
+            const bfWei = await bfContract.balanceOf(address);
+            bfBalance.innerText = ethers.utils.formatUnits(bfWei, 18).slice(0,5);
+            balanceBox.style.display = "block";
+        } catch (e2) {
+            console.error("重试仍失败", e2);
+            balanceBox.style.display = "none";
+        }
     }
 }
 
-// 连接钱包（修复网络判断）
+// 连接钱包（兼容Bitget chainId 字符串/数字）
 connectBtn.addEventListener("click",async ()=>{
     if(!window.ethereum){
         alert("请安装MetaMask/TP钱包等Web3钱包");
         return;
     }
     try{
-        await window.ethereum.request({method:"eth_requestAccounts"});
+        const accounts = await window.ethereum.request({method:"eth_requestAccounts"});
         await switchBSC();
         provider = new ethers.providers.Web3Provider(window.ethereum);
         signer = provider.getSigner();
         const net = await provider.getNetwork();
 
-        // 强制判断链ID，不是BSC直接提示
-        if(net.chainId !== BSC_CHAIN_ID){
+        // 兼容：数字56 或 字符串"0x38"
+        const isBSC = net.chainId === BSC_CHAIN_ID_NUM || net.chainId === BSC_CHAIN_ID_HEX;
+        if(!isBSC){
             walletStatus.innerText = "请手动切换至BSC智能链";
             balanceBox.style.display = "none";
             return;
@@ -303,6 +315,8 @@ connectBtn.addEventListener("click",async ()=>{
         bfContract = new ethers.Contract(BF_TOKEN, TOKEN_ABI, signer);
         const addr = await signer.getAddress();
         walletStatus.innerText = `已连接: ${addr.slice(0,6)}...${addr.slice(-4)}`;
+        
+        // Bitget 不触发事件 → 连接后强制刷新一次
         await refreshBalances(addr);
     }catch(e){
         walletStatus.innerText = "连接失败";
@@ -311,7 +325,7 @@ connectBtn.addEventListener("click",async ()=>{
     }
 })
 
-// 钱包账户/网络变化时自动刷新余额
+// 钱包账户/网络变化（仅作兜底，Bitget不一定触发）
 if (window.ethereum) {
     window.ethereum.on("accountsChanged", async (accounts) => {
         if (accounts.length && signer) {
@@ -328,7 +342,7 @@ if (window.ethereum) {
     });
 }
 
-// BNB买入BF（修复滑点）
+// BNB买入BF
 buyBtn.addEventListener("click",async ()=>{
     if(!signer) return alert("请先连接钱包");
     let bnbVal = Number(payBnb.value);
@@ -357,7 +371,7 @@ buyBtn.addEventListener("click",async ()=>{
     buyBtn.innerText = "确认买入BF";
 })
 
-// BF卖出换BNB（修复滑点）
+// BF卖出换BNB
 sellBtn.addEventListener("click",async ()=>{
     if(!signer) return alert("请先连接钱包");
     let bfVal = Number(payBf.value);

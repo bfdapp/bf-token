@@ -152,7 +152,7 @@ body{
             <input type="number" id="payBnb" placeholder="输入BNB数量" min="0" step="0.01">
         </div>
         <div class="input-item">
-            <label>预估获得 BF 数量</label>
+            <label>预估获得 BF 数量（实时链上）</label>
             <input type="number" id="getBf" placeholder="自动实时估算" readonly>
         </div>
         <button class="swap-btn" id="buyBtn">确认买入BF</button>
@@ -165,7 +165,7 @@ body{
             <input type="number" id="payBf" placeholder="输入BF数量" min="0" step="1">
         </div>
         <div class="input-item">
-            <label>预估获得 BNB 数量</label>
+            <label>预估获得 BNB 数量（实时链上）</label>
             <input type="number" id="getBnb" placeholder="自动实时估算" readonly>
         </div>
         <button class="swap-btn" id="sellBtn">确认卖出换BNB</button>
@@ -182,16 +182,15 @@ body{
 // 全局配置
 const BSC_CHAIN_ID_NUM = 56;
 const BSC_CHAIN_ID_HEX = "0x38";
-// 国内免翻墙BSC节点（核心解决无梯子Bitget）
 const FREE_BSC_RPC = "https://bsc.publicnode.com";
+
 const BF_TOKEN = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
 const PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
-const SWAP_RATE = 1200;
-const SLIPPAGE = 0.8; // 20%滑点适配18%交易税
+
+const SLIPPAGE = 0.8; // 20%滑点
 
 let provider, signer, routerContract, bfContract;
-// 全局备用节点查询器
 let freeRpcProvider = new ethers.providers.JsonRpcProvider(FREE_BSC_RPC,56);
 
 // DOM
@@ -217,11 +216,13 @@ const sellBtn = document.getElementById("sellBtn");
 // ABI
 const ROUTER_ABI = [
     "function swapExactETHForTokens(uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external payable returns (uint256[] memory amounts)",
-    "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)"
+    "function swapExactTokensForETH(uint256 amountIn, uint256 amountOutMin, address[] calldata path, address to, uint256 deadline) external returns (uint256[] memory amounts)",
+    "function getAmountsOut(uint256 amountIn, address[] calldata path) external view returns (uint256[] memory amounts)"
 ];
 const TOKEN_ABI = [
     "function approve(address spender, uint256 amount) external returns (bool)",
-    "function balanceOf(address owner) external view returns (uint256)"
+    "function balanceOf(address owner) external view returns (uint256)",
+    "function decimals() external view returns (uint8)"
 ];
 
 // 标签切换
@@ -238,15 +239,54 @@ sellTab.onclick = ()=>{
     buyBox.classList.add("hide");
 }
 
-// 实时换算
-payBnb.addEventListener("input",()=>{
-    let v = Number(payBnb.value)||0;
-    getBf.value = (v * SWAP_RATE).toFixed(2);
-})
-payBf.addEventListener("input",()=>{
-    let v = Number(payBf.value)||0;
-    getBnb.value = (v / SWAP_RATE).toFixed(6);
-})
+// -------- 核心：实时从链上拿价格 --------
+async function getRealBnbToBf(amountBnb) {
+    if (!routerContract) return 0;
+    try {
+        const amountIn = ethers.utils.parseEther(amountBnb.toString());
+        const path = [WBNB, BF_TOKEN];
+        const amounts = await routerContract.getAmountsOut(amountIn, path);
+        return ethers.utils.formatUnits(amounts[1], 18);
+    } catch (e) {
+        console.error("getRealBnbToBf fail", e);
+        return 0;
+    }
+}
+
+async function getRealBfToBnb(amountBf) {
+    if (!routerContract) return 0;
+    try {
+        const amountIn = ethers.utils.parseUnits(amountBf.toString(), 18);
+        const path = [BF_TOKEN, WBNB];
+        const amounts = await routerContract.getAmountsOut(amountIn, path);
+        return ethers.utils.formatEther(amounts[1]);
+    } catch (e) {
+        console.error("getRealBfToBnb fail", e);
+        return 0;
+    }
+}
+
+// 买入实时计算（链上真实）
+payBnb.addEventListener("input", async () => {
+    let v = Number(payBnb.value) || 0;
+    if (v <= 0) {
+        getBf.value = "";
+        return;
+    }
+    const realBf = await getRealBnbToBf(v);
+    getBf.value = Number(realBf).toFixed(2);
+});
+
+// 卖出实时计算（链上真实）
+payBf.addEventListener("input", async () => {
+    let v = Number(payBf.value) || 0;
+    if (v <= 0) {
+        getBnb.value = "";
+        return;
+    }
+    const realBnb = await getRealBfToBnb(v);
+    getBnb.value = Number(realBnb).toFixed(6);
+});
 
 // 自动添加BSC链
 async function switchBSC() {
@@ -264,17 +304,15 @@ async function switchBSC() {
     }catch(e){}
 }
 
-// 余额查询：优先钱包节点，失败直接用国内免费节点（完美兼容Bitget）
+// 余额查询：优先钱包节点，失败切国内节点
 async function refreshBalances(walletAddr) {
     let bnbNum,bfNum;
     try{
-        // 优先钱包自身节点
         let bnbWei = await provider.getBalance(walletAddr);
         let bfWei = await bfContract.balanceOf(walletAddr);
         bnbNum = ethers.utils.formatEther(bnbWei);
         bfNum = ethers.utils.formatUnits(bfWei,18);
     }catch(err){
-        // 钱包节点被墙，强制用国内免翻墙节点
         let bnbWei = await freeRpcProvider.getBalance(walletAddr);
         let bfCon = new ethers.Contract(BF_TOKEN,TOKEN_ABI,freeRpcProvider);
         let bfWei = await bfCon.balanceOf(walletAddr);
@@ -331,7 +369,9 @@ buyBtn.addEventListener("click",async ()=>{
     buyBtn.innerText="交易提交中...";
     try{
         let val = ethers.utils.parseEther(num.toString());
-        let minGet = ethers.utils.parseEther((num*SWAP_RATE*SLIPPAGE).toFixed(6));
+        // 真实数量 * 滑点
+        let realBf = await getRealBnbToBf(num);
+        let minGet = ethers.utils.parseEther((Number(realBf) * SLIPPAGE).toFixed(6));
         let user = await signer.getAddress();
         let deadline = Math.floor(Date.now()/1000)+600;
         let tx = await routerContract.swapExactETHForTokens(minGet,[WBNB,BF_TOKEN],user,deadline,{value:val});
@@ -355,8 +395,8 @@ sellBtn.addEventListener("click",async ()=>{
     try{
         let user = await signer.getAddress();
         let sellAmount = ethers.utils.parseUnits(num.toString(),18);
-        let expectBnb = num/SWAP_RATE;
-        let minOut = ethers.utils.parseEther((expectBnb*SLIPPAGE).toFixed(6));
+        let realBnb = await getRealBfToBnb(num);
+        let minOut = ethers.utils.parseEther((Number(realBnb) * SLIPPAGE).toFixed(6));
         let deadline = Math.floor(Date.now()/1000)+600;
         // 授权
         let appTx = await bfContract.approve(PANCAKE_ROUTER,sellAmount);

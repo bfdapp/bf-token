@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
-<title>BF 双向币币交易</title>
+<title>BF 双向链上兑换</title>
 <link rel="icon" href="favicon.ico">
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 <style>
@@ -172,7 +172,7 @@ body{
     </div>
 
     <div class="tips">
-        须知：自动添加切换BSC币安智能链，国内普通网络直连无需加速器，交易采用薄饼官方路由
+        须知：自动添加切换BSC币安智能链，国内普通网络直连无需加速器，交易采用薄饼官方路由。税费18%，滑点已设20%。
     </div>
 
     <a href="index.html" class="back-btn">← 返回官方首页</a>
@@ -185,7 +185,7 @@ const BF_TOKEN = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
 const PANCAKE_ROUTER = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const SWAP_RATE = 1200;
-const SLIPPAGE = 0.95;
+const SLIPPAGE = 0.8; // 20%滑点，适配18%税
 
 let provider, signer, routerContract, bfContract;
 
@@ -216,8 +216,7 @@ const ROUTER_ABI = [
 ];
 const TOKEN_ABI = [
     "function approve(address spender, uint256 amount) external returns (bool)",
-    "function balanceOf(address owner) external view returns (uint256)",
-    "function decimals() external view returns (uint8)"
+    "function balanceOf(address owner) external view returns (uint256)"
 ];
 
 // 标签切换
@@ -258,28 +257,30 @@ async function switchBSC() {
                 blockExplorerUrls: ["https://bscscan.com"]
             }]
         });
-    }catch(e){}
+    }catch(e){
+        console.error("切换BSC失败",e);
+    }
 }
 
-// 刷新余额
+// 刷新余额（修复版）
 async function refreshBalances(address) {
     try {
         // BNB余额
         const bnbWei = await provider.getBalance(address);
         bnbBalance.innerText = ethers.utils.formatEther(bnbWei).slice(0,6);
 
-        // BF余额
-        const bfDec = await bfContract.decimals();
+        // BF余额（硬写死decimals=18，避免调用失败）
         const bfWei = await bfContract.balanceOf(address);
-        bfBalance.innerText = ethers.utils.formatUnits(bfWei, bfDec).slice(0,5);
+        bfBalance.innerText = ethers.utils.formatUnits(bfWei, 18).slice(0,5);
 
         balanceBox.style.display = "block";
     } catch (e) {
         console.error("刷新余额失败", e);
+        balanceBox.style.display = "none";
     }
 }
 
-// 连接钱包
+// 连接钱包（修复网络判断）
 connectBtn.addEventListener("click",async ()=>{
     if(!window.ethereum){
         alert("请安装MetaMask/TP钱包等Web3钱包");
@@ -291,6 +292,8 @@ connectBtn.addEventListener("click",async ()=>{
         provider = new ethers.providers.Web3Provider(window.ethereum);
         signer = provider.getSigner();
         const net = await provider.getNetwork();
+
+        // 强制判断链ID，不是BSC直接提示
         if(net.chainId !== BSC_CHAIN_ID){
             walletStatus.innerText = "请手动切换至BSC智能链";
             balanceBox.style.display = "none";
@@ -304,6 +307,7 @@ connectBtn.addEventListener("click",async ()=>{
     }catch(e){
         walletStatus.innerText = "连接失败";
         balanceBox.style.display = "none";
+        console.error(e);
     }
 })
 
@@ -324,7 +328,7 @@ if (window.ethereum) {
     });
 }
 
-// BNB买入BF
+// BNB买入BF（修复滑点）
 buyBtn.addEventListener("click",async ()=>{
     if(!signer) return alert("请先连接钱包");
     let bnbVal = Number(payBnb.value);
@@ -348,11 +352,12 @@ buyBtn.addEventListener("click",async ()=>{
     }catch(e){
         if(e.message.includes("insufficient funds")) alert("BNB余额不足");
         else alert("交易失败："+e.message.substr(0,50));
+        console.error(e);
     }
     buyBtn.innerText = "确认买入BF";
 })
 
-// BF卖出换BNB
+// BF卖出换BNB（修复滑点）
 sellBtn.addEventListener("click",async ()=>{
     if(!signer) return alert("请先连接钱包");
     let bfVal = Number(payBf.value);
@@ -361,8 +366,7 @@ sellBtn.addEventListener("click",async ()=>{
     sellBtn.innerText = "授权并卖出中...";
     try{
         const userAddr = await signer.getAddress();
-        const bfDec = await bfContract.decimals();
-        const sellAmount = ethers.utils.parseUnits(bfVal.toString(),bfDec);
+        const sellAmount = ethers.utils.parseUnits(bfVal.toString(),18);
         const expectBnb = bfVal / SWAP_RATE;
         const minBnb = ethers.utils.parseEther((expectBnb * SLIPPAGE).toFixed(6));
         const path = [BF_TOKEN, WBNB];
@@ -383,6 +387,7 @@ sellBtn.addEventListener("click",async ()=>{
     }catch(e){
         if(e.message.includes("allowance")) alert("授权失败，请重试");
         else alert("交易失败："+e.message.substr(0,50));
+        console.error(e);
     }
     sellBtn.innerText = "确认卖出换BNB";
 })

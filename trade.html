@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
 <title>BF 双向链上兑换</title>
 <link rel="icon" href="favicon.ico">
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
@@ -314,7 +314,6 @@ buyBtn.onclick = async () => {
         if (!val || val <= 0) { alert("输入数量"); return; }
         buyBtn.innerText = "交易中...";
         const out = await getQuote(val, [WBNB, BF_TOKEN]);
-        // 买入滑点：30%
         const minOut = ethers.utils.parseEther((out * 0.70).toFixed(6));
         const tx = await router.swapExactETHForTokens(
             minOut,
@@ -352,15 +351,13 @@ sellBtn.onclick = async () => {
         const quote = await getQuote(val, [BF_TOKEN, WBNB]);
         if (Number(quote) <= 0) throw new Error("无法获取报价");
         
-        // 卖出滑点：30%，适配18%税费+价格波动
-        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.70).toFixed(8));
+        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.50).toFixed(8));
 
         sellBtn.innerText = "交易中...";
         const deadline = Math.floor(Date.now() / 1000) + 600;
         
         let swapTx;
         try {
-            // 第一次尝试：主节点
             swapTx = await router.swapExactTokensForETH(
                 bfAmount,
                 minBNBOut,
@@ -370,7 +367,6 @@ sellBtn.onclick = async () => {
             );
         } catch (rpcError) {
             console.warn("主节点失败，使用备用节点重试", rpcError);
-            // 备用节点重试
             const fallbackProvider = new ethers.providers.JsonRpcProvider(RPC_LIST[1], BSC_CHAIN_ID);
             const fallbackRouter = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, fallbackProvider.connect(signer));
             swapTx = await fallbackRouter.swapExactTokensForETH(

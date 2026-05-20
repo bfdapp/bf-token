@@ -223,7 +223,8 @@ const sellBox = document.getElementById("sellBox");
 const ROUTER_ABI = [
     "function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)",
     "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)",
-    "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)"
+    "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)",
+    "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external"
 ];
 
 const BEP20_ABI = [
@@ -355,7 +356,7 @@ buyBtn.onclick = async () => {
     }
 };
 
-// ========== 修复后的卖出功能 ==========
+// 修复后的卖出功能 - 使用 SupportFeeOnTransferTokens 方法
 sellBtn.onclick = async () => {
     if (!signer) return alert("请先连接钱包");
     const val = Number(payBf.value);
@@ -374,12 +375,12 @@ sellBtn.onclick = async () => {
         const quote = await getQuote(val, [BF_TOKEN, WBNB]);
         if (Number(quote) <= 0) throw new Error("无法获取报价");
         
-        // 18%税费 + 5%滑点 = 23%滑点保护
-        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.60).toFixed(8));  // 40%滑点
+        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.95).toFixed(8));
+
         sellBtn.innerText = "交易中...";
         const deadline = Math.floor(Date.now() / 1000) + 600;
         
-        const swapTx = await router.swapExactTokensForETH(
+        const swapTx = await router.swapExactTokensForETHSupportingFeeOnTransferTokens(
             bfAmount,
             minBNBOut,
             [BF_TOKEN, WBNB],
@@ -399,7 +400,6 @@ sellBtn.onclick = async () => {
         if (err.message.includes("user rejected")) msg = "你取消了交易";
         if (err.message.includes("insufficient funds")) msg = "BNB手续费不足";
         if (err.message.includes("transfer amount exceeds balance")) msg = "BF余额不足";
-        if (err.message.includes("INSUFFICIENT_OUTPUT_AMOUNT")) msg = "滑点保护触发，请稍后重试（代币有18%税费）";
         alert("卖出失败：" + msg);
     } finally {
         sellBtn.innerText = "确认卖出BF";

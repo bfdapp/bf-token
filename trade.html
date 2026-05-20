@@ -177,10 +177,14 @@ const BSC_HEX = "0x38";
 const BF_TOKEN = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
 const ROUTER_ADDR = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
-const RPC = "https://bsc.publicnode.com";
+const RPC_LIST = [
+    "https://bsc-dataseed.binance.org",
+    "https://bsc.publicnode.com",
+    "https://rpc.ankr.com/bsc"
+];
 
 let provider, signer, router, bfContract;
-const readProvider = new ethers.providers.JsonRpcProvider(RPC, BSC_CHAIN_ID);
+let readProvider = new ethers.providers.JsonRpcProvider(RPC_LIST[0], BSC_CHAIN_ID);
 
 const homeBtn = document.getElementById("homeBtn");
 const connectBtn = document.getElementById("connectBtn");
@@ -236,7 +240,7 @@ async function switchBSC() {
                 chainId: BSC_HEX,
                 chainName: "BSC",
                 nativeCurrency: { name: "BNB", symbol: "BNB", decimals: 18 },
-                rpcUrls: [RPC],
+                rpcUrls: RPC_LIST,
                 blockExplorerUrls: ["https://bscscan.com"]
             }]
         });
@@ -244,14 +248,18 @@ async function switchBSC() {
 }
 
 async function getQuote(amountIn, path) {
-    try {
-        const r = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, readProvider);
-        const amt = ethers.utils.parseEther(amountIn.toString());
-        const out = await r.getAmountsOut(amt, path);
-        return ethers.utils.formatUnits(out[1], 18);
-    } catch (e) {
-        return "0";
+    for (const rpc of RPC_LIST) {
+        try {
+            const tempProvider = new ethers.providers.JsonRpcProvider(rpc, BSC_CHAIN_ID);
+            const r = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, tempProvider);
+            const amt = ethers.utils.parseEther(amountIn.toString());
+            const out = await r.getAmountsOut(amt, path);
+            return ethers.utils.formatUnits(out[1], 18);
+        } catch (e) {
+            continue;
+        }
     }
+    return "0";
 }
 
 async function refreshPrice() {
@@ -306,7 +314,8 @@ buyBtn.onclick = async () => {
         if (!val || val <= 0) { alert("输入数量"); return; }
         buyBtn.innerText = "交易中...";
         const out = await getQuote(val, [WBNB, BF_TOKEN]);
-        const minOut = ethers.utils.parseEther((out * 0.80).toFixed(6));
+        // 买入滑点：30%
+        const minOut = ethers.utils.parseEther((out * 0.70).toFixed(6));
         const tx = await router.swapExactETHForTokens(
             minOut,
             [WBNB, BF_TOKEN],
@@ -343,18 +352,35 @@ sellBtn.onclick = async () => {
         const quote = await getQuote(val, [BF_TOKEN, WBNB]);
         if (Number(quote) <= 0) throw new Error("无法获取报价");
         
-        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.75).toFixed(8));
+        // 卖出滑点：30%，适配18%税费+价格波动
+        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.70).toFixed(8));
 
         sellBtn.innerText = "交易中...";
         const deadline = Math.floor(Date.now() / 1000) + 600;
         
-        const swapTx = await router.swapExactTokensForETH(
-            bfAmount,
-            minBNBOut,
-            [BF_TOKEN, WBNB],
-            userAddr,
-            deadline
-        );
+        let swapTx;
+        try {
+            // 第一次尝试：主节点
+            swapTx = await router.swapExactTokensForETH(
+                bfAmount,
+                minBNBOut,
+                [BF_TOKEN, WBNB],
+                userAddr,
+                deadline
+            );
+        } catch (rpcError) {
+            console.warn("主节点失败，使用备用节点重试", rpcError);
+            // 备用节点重试
+            const fallbackProvider = new ethers.providers.JsonRpcProvider(RPC_LIST[1], BSC_CHAIN_ID);
+            const fallbackRouter = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, fallbackProvider.connect(signer));
+            swapTx = await fallbackRouter.swapExactTokensForETH(
+                bfAmount,
+                minBNBOut,
+                [BF_TOKEN, WBNB],
+                userAddr,
+                deadline
+            );
+        }
 
         alert(`交易已提交！\n哈希：${swapTx.hash}`);
         await swapTx.wait();
@@ -363,10 +389,11 @@ sellBtn.onclick = async () => {
 
     } catch (err) {
         console.error(err);
-        let msg = "卖出失败，请提高滑点或重试";
-        if (err.message.includes("user rejected")) msg = "已取消交易";
+        let msg = "卖出失败，请检查滑点或网络";
+        if (err.message.includes("user rejected")) msg = "你取消了交易";
         if (err.message.includes("insufficient funds")) msg = "BNB手续费不足";
         if (err.message.includes("transfer amount exceeds balance")) msg = "BF余额不足";
+        if (err.message.includes("INSUFFICIENT_OUTPUT_AMOUNT")) msg = "滑点过低，请重试";
         alert("卖出失败：" + msg);
     } finally {
         sellBtn.innerText = "确认卖出BF";

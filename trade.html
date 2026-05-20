@@ -124,6 +124,19 @@ body{
     font-size:14px;
 }
 .hide{display:none;}
+.pct-btn {
+    padding:6px 12px;
+    border-radius:6px;
+    border:none;
+    background:#161e33;
+    color:#999;
+    font-size:14px;
+    cursor:pointer;
+}
+.pct-btn.active {
+    background:#27c707;
+    color:#fff;
+}
 </style>
 </head>
 <body>
@@ -159,6 +172,11 @@ body{
     </div>
 
     <div class="swap-box hide" id="sellBox">
+        <div style="display:flex;justify-content:flex-end;gap:10px;margin-bottom:15px;">
+            <button class="pct-btn" data-pct="25">25%</button>
+            <button class="pct-btn" data-pct="50">50%</button>
+            <button class="pct-btn active" data-pct="100">MAX</button>
+        </div>
         <div class="input-item">
             <label>卖出 BF 数量</label>
             <input type="number" id="payBf" placeholder="输入BF数量" min="0" step="0.0001">
@@ -344,7 +362,7 @@ sellBtn.onclick = async () => {
         const bfAmount = ethers.utils.parseUnits(val.toString(), 18);
 
         sellBtn.innerText = "授权中...";
-        const approveTx = await bfContract.approve(ROUTER_ADDR, bfAmount);
+        const approveTx = await bfContract.approve(ROUTER_ADDR, ethers.constants.MaxUint256);
         await approveTx.wait();
 
         sellBtn.innerText = "获取报价...";
@@ -385,16 +403,36 @@ sellBtn.onclick = async () => {
 
     } catch (err) {
         console.error(err);
-        let msg = "卖出失败，请检查滑点或网络";
+        let msg = "卖出失败，请检查网络";
         if (err.message.includes("user rejected")) msg = "你取消了交易";
         if (err.message.includes("insufficient funds")) msg = "BNB手续费不足";
         if (err.message.includes("transfer amount exceeds balance")) msg = "BF余额不足";
-        if (err.message.includes("INSUFFICIENT_OUTPUT_AMOUNT")) msg = "滑点过低，请重试";
+        if (err.message.includes("INSUFFICIENT_OUTPUT_AMOUNT")) msg = "滑点不足，请稍候重试";
         alert("卖出失败：" + msg);
     } finally {
         sellBtn.innerText = "确认卖出BF";
     }
 };
+
+// 卖出百分比快捷按钮
+const pctBtns = document.querySelectorAll(".pct-btn");
+pctBtns.forEach(btn => {
+    btn.onclick = async function(){
+        if(!signer) return alert("请先连接钱包");
+        pctBtns.forEach(b => b.classList.remove("active"));
+        this.classList.add("active");
+        const pct = parseInt(this.dataset.pct);
+        const userAddr = await signer.getAddress();
+        const bfCon = new ethers.Contract(BF_TOKEN, BEP20_ABI, readProvider);
+        const balance = await bfCon.balanceOf(userAddr);
+        const num = parseFloat(ethers.utils.formatEther(balance));
+        if(num <= 0) return alert("暂无可卖出余额");
+        const selected = num * pct / 100;
+        payBf.value = selected.toFixed(4);
+        const quote = await getQuote(selected, [BF_TOKEN, WBNB]);
+        getBnb.value = parseFloat(quote).toFixed(6);
+    };
+});
 </script>
 </body>
 </html>

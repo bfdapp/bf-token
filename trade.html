@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=.0,maximum-scale=1.0,user-scalable=no">
 <title>BF 双向链上兑换</title>
 <link rel="icon" href="favicon.ico">
 <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
@@ -178,7 +178,6 @@ const BF_TOKEN = "0x364a8b5a70ddd45b48fd7aed0ca3c8e826033dad";
 const ROUTER_ADDR = "0x10ED43C718714eb63d5aA57B78B54704E256024E";
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const RPC = "https://bsc.publicnode.com";
-const SLIPPAGE = 0.75;
 
 let provider, signer, router, bfContract;
 const readProvider = new ethers.providers.JsonRpcProvider(RPC, BSC_CHAIN_ID);
@@ -307,7 +306,7 @@ buyBtn.onclick = async () => {
         if (!val || val <= 0) { alert("输入数量"); return; }
         buyBtn.innerText = "交易中...";
         const out = await getQuote(val, [WBNB, BF_TOKEN]);
-        const minOut = ethers.utils.parseEther((out * SLIPPAGE).toFixed(6));
+        const minOut = ethers.utils.parseEther((out * 0.80).toFixed(6));
         const tx = await router.swapExactETHForTokens(
             minOut,
             [WBNB, BF_TOKEN],
@@ -336,43 +335,26 @@ sellBtn.onclick = async () => {
         const userAddr = await signer.getAddress();
         const bfAmount = ethers.utils.parseUnits(val.toString(), 18);
 
-        // 1. 授权：先完成授权，和薄饼流程一致
         sellBtn.innerText = "授权中...";
         const approveTx = await bfContract.approve(ROUTER_ADDR, bfAmount);
         await approveTx.wait();
 
-        // 2. 价格计算：使用备用节点计算，更稳定
         sellBtn.innerText = "获取报价...";
         const quote = await getQuote(val, [BF_TOKEN, WBNB]);
         if (Number(quote) <= 0) throw new Error("无法获取报价");
-        const minBNBOut = ethers.utils.parseEther((Number(quote) * SLIPPAGE).toFixed(6));
+        
+        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.75).toFixed(8));
 
-        // 3. 交易执行：超时自动用备用节点重试
         sellBtn.innerText = "交易中...";
         const deadline = Math.floor(Date.now() / 1000) + 600;
-        let swapTx;
-
-        try {
-            // 第一次尝试：用钱包节点
-            swapTx = await router.swapExactTokensForETH(
-                bfAmount,
-                minBNBOut,
-                [BF_TOKEN, WBNB],
-                userAddr,
-                deadline
-            );
-        } catch (rpcError) {
-            console.warn("钱包节点超时，使用备用节点重试", rpcError);
-            // 备用节点重试：和薄饼一样的降级策略
-            const fallbackRouter = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, readProvider.connect(signer));
-            swapTx = await fallbackRouter.swapExactTokensForETH(
-                bfAmount,
-                minBNBOut,
-                [BF_TOKEN, WBNB],
-                userAddr,
-                deadline
-            );
-        }
+        
+        const swapTx = await router.swapExactTokensForETH(
+            bfAmount,
+            minBNBOut,
+            [BF_TOKEN, WBNB],
+            userAddr,
+            deadline
+        );
 
         alert(`交易已提交！\n哈希：${swapTx.hash}`);
         await swapTx.wait();
@@ -381,18 +363,15 @@ sellBtn.onclick = async () => {
 
     } catch (err) {
         console.error(err);
-        let msg = "未知错误";
-        if (err.message.includes("user rejected")) msg = "你取消了签名";
-        else if (err.message.includes("insufficient funds")) msg = "BNB手续费不足";
-        else if (err.message.includes("timeout") || err.message.includes("JsonRpcEngine")) msg = "节点超时，请重试";
-        else if (err.message.includes("transfer amount exceeds balance")) msg = "BF余额不足";
+        let msg = "卖出失败，请提高滑点或重试";
+        if (err.message.includes("user rejected")) msg = "已取消交易";
+        if (err.message.includes("insufficient funds")) msg = "BNB手续费不足";
+        if (err.message.includes("transfer amount exceeds balance")) msg = "BF余额不足";
         alert("卖出失败：" + msg);
     } finally {
         sellBtn.innerText = "确认卖出BF";
     }
 };
-
-      
 </script>
 </body>
 </html>

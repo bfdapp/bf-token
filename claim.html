@@ -163,22 +163,17 @@
 <script>
 const CONTRACT_ADDR = "0x364a8b5A70dDd45B48fD7aed0ca3C8e826033DAd";
 const ABI = [
-    {"inputs":[],"name":"claimDividend","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[],"name":"getMyPending","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
     {"inputs":[{"internalType":"address","name":"a","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userLevel1Count","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userLevel2Count","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"userLevel3Count","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"}
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"level1","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"level2","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[{"internalType":"address","name":"","type":"address"}],"name":"level3","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"pendingDividend","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+    {"inputs":[],"name":"claimDividend","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ];
 
-// 备用稳定BSC节点，双节点防超时
 const MAIN_RPC = "https://bsc-dataseed.binance.org";
-const BACKUP_RPC = "https://bsc.publicnode.com";
-let web3,account,contract;
+let web3, account, contract;
 const modal = document.getElementById("walletModal");
-// 全局备用查询实例
-const backupWeb3 = new Web3(new Web3.providers.HttpProvider(BACKUP_RPC));
-const backupContract = new backupWeb3.eth.Contract(ABI, CONTRACT_ADDR);
 
 function openWalletSelect(){modal.style.display = "flex";}
 function closeWalletSelect(){modal.style.display = "none";}
@@ -186,102 +181,72 @@ function closeWalletSelect(){modal.style.display = "none";}
 async function walletConnect(walletName){
     closeWalletSelect();
     if(!window.ethereum){
-        alert(`暂未检测到【${walletName}】，请先安装并打开钱包`);
+        alert(`请安装并打开${walletName}钱包`);
         return;
     }
     try{
-        // 请求授权
         let accounts = await ethereum.request({method:"eth_requestAccounts"});
         account = accounts[0];
         web3 = new Web3(ethereum);
-
-        // 强制校验必须在BSC链
         let chainId = await web3.eth.getChainId();
         if(chainId !== 56){
-            alert("请手动切换钱包网络为 BSC 智能链(BNB)！");
+            alert("请切换到 BSC 智能链");
             return;
         }
-
-        contract = new web3.eth.Contract(ABI,CONTRACT_ADDR);
-        document.getElementById("walletAddr").innerText = account.slice(0,12)+"..."+account.slice(-8);
+        contract = new web3.eth.Contract(ABI, CONTRACT_ADDR);
+        document.getElementById("walletAddr").innerText = account.slice(0,10)+"..."+account.slice(-4);
         document.getElementById("walletType").innerText = walletName;
-        // 连接自动加载全部数据
-        await refreshAllData();
+        loadAllData();
     }catch(e){
-        alert("钱包连接失败，请重启钱包重试");
+        alert("钱包连接失败");
     }
 }
 
-function connectMetaMask(){walletConnect("小狐狸 MetaMask")}
-function connectTrust(){walletConnect("Trust 通用钱包")}
-function connectTP(){walletConnect("TP 多链钱包")}
-function connectOKX(){walletConnect("OKX 欧易钱包")}
-function connectBitget(){walletConnect("Bitget 比特钱包")}
-
-// 统一刷新：资产+分红
-async function refreshAllData(){
+async function loadAllData(){
     if(!account) return;
     try{
-        // 优先钱包节点查询
-        let bfBalance = await contract.methods.balanceOf(account).call();
-        let canDiv = await contract.methods.getMyPending().call();
+        let bal = await contract.methods.balanceOf(account).call();
+        let div = await contract.methods.pendingDividend(account).call();
+        let l1 = await contract.methods.level1(account).call();
+        let l2 = await contract.methods.level2(account).call();
+        let l3 = await contract.methods.level3(account).call();
 
-        // 查询失败自动切备用节点
-        if(bfBalance === "0" || !bfBalance){
-            bfBalance = await backupContract.methods.balanceOf(account).call();
-        }
-        if(canDiv === "0" || !canDiv){
-            canDiv = await backupContract.methods.getMyPending().call();
-        }
-
-        document.getElementById("balanceNum").innerText = Number(web3.utils.fromWei(bfBalance,"ether")).toFixed(4);
-        document.getElementById("divNum").innerText = Number(web3.utils.fromWei(canDiv,"ether")).toFixed(4);
-    }catch(e){
-        console.log("数据读取异常");
-    }
-}
-
-// 领取分红
-async function manualClaim(){
-    if(!account)return alert("请先连接钱包");
-    try{
-        await contract.methods.claimDividend().send({from:account});
-        alert("🎉 分红领取成功，资产已发放！");
-        refreshAllData();
-    }catch(e){
-        alert("领取失败：余额不足/手续费不足/暂无分红");
-    }
-}
-
-// 查询三级团队人数（已修复传参+双节点）
-async function checkMyTeam(){
-    if(!account)return alert("请先连接钱包");
-    try{
-        let l1,l2,l3;
-        // 主节点
-        l1 = await contract.methods.userLevel1Count(account).call();
-        l2 = await contract.methods.userLevel2Count(account).call();
-        l3 = await contract.methods.userLevel3Count(account).call();
-
-        // 备用节点补查
-        if(!l1) l1 = await backupContract.methods.userLevel1Count(account).call();
-        if(!l2) l2 = await backupContract.methods.userLevel2Count(account).call();
-        if(!l3) l3 = await backupContract.methods.userLevel3Count(account).call();
-
+        document.getElementById("balanceNum").innerText = Number(web3.utils.fromWei(bal,"ether")).toFixed(4);
+        document.getElementById("divNum").innerText = Number(web3.utils.fromWei(div,"ether")).toFixed(4);
         document.getElementById("level1").innerText = l1;
         document.getElementById("level2").innerText = l2;
         document.getElementById("level3").innerText = l3;
-
-        alert(`✅ 团队数据查询成功
-一级直推：${l1} 人
-二级团队：${l2} 人
-三级团队：${l3} 人`);
     }catch(e){
-        alert("暂无团队数据或合约未开放统计");
+        console.error(e);
     }
 }
 
-// 监听钱包切换地址/切换网络自动刷新
+async function manualClaim(){
+    if(!account){alert("请先连接钱包");return;}
+    try{
+        await contract.methods.claimDividend().send({from:account});
+        alert("分红领取成功");
+        loadAllData();
+    }catch(e){
+        alert("领取失败");
+    }
+}
+
+async function checkMyTeam(){
+    if(!account){alert("请先连接钱包");return;}
+    await loadAllData();
+    let l1=document.getElementById("level1").innerText;
+    let l2=document.getElementById("level2").innerText;
+    let l3=document.getElementById("level3").innerText;
+    alert(`一级：${l1}\n二级：${l2}\n三级：${l3}`);
+}
+
+function connectMetaMask(){walletConnect("MetaMask");}
+function connectTrust(){walletConnect("Trust Wallet");}
+function connectTP(){walletConnect("TP Wallet");}
+function connectOKX(){walletConnect("OKX Wallet");}
+function connectBitget(){walletConnect("Bitget Wallet");}
+
 if(window.ethereum){
     ethereum.on("accountsChanged",()=>location.reload());
     ethereum.on("chainChanged",()=>location.reload());

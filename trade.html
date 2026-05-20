@@ -375,8 +375,7 @@ sellBtn.onclick = async () => {
         if (Number(quote) <= 0) throw new Error("无法获取报价");
         
         // 18%税费 + 5%滑点 = 23%滑点保护
-        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.77).toFixed(8));
-
+        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.60).toFixed(8));  // 40%滑点
         sellBtn.innerText = "交易中...";
         const deadline = Math.floor(Date.now() / 1000) + 600;
         

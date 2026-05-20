@@ -336,11 +336,7 @@ buyBtn.onclick = async () => {
         if (!val || val <= 0) { alert("输入数量"); return; }
         buyBtn.innerText = "交易中...";
         const out = await getQuote(val, [WBNB, BF_TOKEN]);
-        
-        // 修复：考虑18%税费，买入也需要足够的滑点保护
-        const slippageWithTax = 0.20; // 20% 包含税费和滑点
-        const minOut = ethers.utils.parseEther((parseFloat(out) * (1 - slippageWithTax)).toFixed(6));
-        
+        const minOut = ethers.utils.parseEther((out * 0.70).toFixed(6));
         const tx = await router.swapExactETHForTokens(
             minOut,
             [WBNB, BF_TOKEN],
@@ -351,13 +347,66 @@ buyBtn.onclick = async () => {
         alert("已提交：" + tx.hash);
         await tx.wait();
         alert("买入成功！");
-        await loadBalances(await signer.getAddress());
+        loadBalances(await signer.getAddress());
     } catch (e) {
         alert("买入失败：" + e.message);
     } finally {
         buyBtn.innerText = "确认买入BF";
     }
 };
+
+// ========== 修复后的卖出功能 ==========
+sellBtn.onclick = async () => {
+    if (!signer) return alert("请先连接钱包");
+    const val = Number(payBf.value);
+    if (!val || val <= 0) return alert("请输入正确的BF数量");
+
+    sellBtn.innerText = "准备交易...";
+    try {
+        const userAddr = await signer.getAddress();
+        const bfAmount = ethers.utils.parseUnits(val.toString(), 18);
+
+        sellBtn.innerText = "授权中...";
+        const approveTx = await bfContract.approve(ROUTER_ADDR, ethers.constants.MaxUint256);
+        await approveTx.wait();
+
+        sellBtn.innerText = "获取报价...";
+        const quote = await getQuote(val, [BF_TOKEN, WBNB]);
+        if (Number(quote) <= 0) throw new Error("无法获取报价");
+        
+        // 18%税费 + 5%滑点 = 23%滑点保护
+        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.77).toFixed(8));
+
+        sellBtn.innerText = "交易中...";
+        const deadline = Math.floor(Date.now() / 1000) + 600;
+        
+        const swapTx = await router.swapExactTokensForETH(
+            bfAmount,
+            minBNBOut,
+            [BF_TOKEN, WBNB],
+            userAddr,
+            deadline,
+            { gasLimit: 500000 }
+        );
+
+        alert(`交易已提交！\n哈希：${swapTx.hash}`);
+        await swapTx.wait();
+        alert("卖出成功，BNB已到账！");
+        await loadBalances(userAddr);
+
+    } catch (err) {
+        console.error(err);
+        let msg = "卖出失败，请检查网络";
+        if (err.message.includes("user rejected")) msg = "你取消了交易";
+        if (err.message.includes("insufficient funds")) msg = "BNB手续费不足";
+        if (err.message.includes("transfer amount exceeds balance")) msg = "BF余额不足";
+        if (err.message.includes("INSUFFICIENT_OUTPUT_AMOUNT")) msg = "滑点保护触发，请稍后重试（代币有18%税费）";
+        alert("卖出失败：" + msg);
+    } finally {
+        sellBtn.innerText = "确认卖出BF";
+    }
+};
+
 document.querySelectorAll(".pct-btn").forEach(btn => {
     btn.onclick = async () => {
         if(!signer) return alert("请先连接钱包");

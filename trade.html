@@ -165,10 +165,6 @@ body{
             <input type="number" id="payBnb" placeholder="输入BNB数量" min="0" step="0.0001">
         </div>
         <div class="input-item">
-            <label>滑点设置（建议 25%）</label>
-            <input type="number" id="slippageBuy" value="25" placeholder="滑点%" min="1" max="99">
-        </div>
-        <div class="input-item">
             <label>预估获得 BF</label>
             <input type="text" id="getBf" placeholder="自动计算" readonly>
         </div>
@@ -181,14 +177,18 @@ body{
             <button class="pct-btn" data-pct="50">50%</button>
             <button class="pct-btn active" data-pct="100">MAX</button>
         </div>
+
         <div class="input-item">
             <label>卖出 BF 数量</label>
             <input type="number" id="payBf" placeholder="输入BF数量" min="0" step="0.0001">
         </div>
+
+        <!-- ✅ 这里加了滑点输入框 -->
         <div class="input-item">
             <label>滑点设置（建议 25%）</label>
             <input type="number" id="slippage" value="25" placeholder="滑点%" min="1" max="99">
         </div>
+
         <div class="input-item">
             <label>预估获得 BNB</label>
             <input type="text" id="getBnb" placeholder="自动计算" readonly>
@@ -227,15 +227,13 @@ const buyTab = document.getElementById("buyTab");
 const sellTab = document.getElementById("sellTab");
 const buyBox = document.getElementById("buyBox");
 const sellBox = document.getElementById("sellBox");
-const slippageInput = document.getElementById("slippage");
-const slippageBuyInput = document.getElementById("slippageBuy");
+const slippageInput = document.getElementById("slippage"); // ✅ 滑点
 
 const ROUTER_ABI = [
     "function getAmountsOut(uint amountIn, address[] calldata path) external view returns (uint[] memory amounts)",
     "function swapExactETHForTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable returns (uint[] memory amounts)",
     "function swapExactTokensForETH(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external returns (uint[] memory amounts)",
-    "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external",
-    "function swapExactETHForTokensSupportingFeeOnTransferTokens(uint amountOutMin, address[] calldata path, address to, uint deadline) external payable"
+    "function swapExactTokensForETHSupportingFeeOnTransferTokens(uint amountIn, uint amountOutMin, address[] calldata path, address to, uint deadline) external"
 ];
 
 const BEP20_ABI = [
@@ -341,30 +339,20 @@ connectBtn.onclick = async () => {
     }
 };
 
-// ✅ 修复核心：使用支持扣税代币的买入方法 + 滑点25%
 buyBtn.onclick = async () => {
     try {
         if (!signer) { alert("请连接钱包"); return; }
         const val = payBnb.value;
         if (!val || val <= 0) { alert("输入数量"); return; }
         buyBtn.innerText = "交易中...";
-        
-        const slippageBuy = Number(slippageBuyInput.value) || 25;
-        const factor = (100 - slippageBuy) / 100;
-        
         const out = await getQuote(val, [WBNB, BF_TOKEN]);
-        const minOut = ethers.utils.parseEther((Number(out) * factor).toFixed(6));
-        const deadline = Math.floor(Date.now() / 1000) + 600;
-        
-        const tx = await router.swapExactETHForTokensSupportingFeeOnTransferTokens(
+        const minOut = ethers.utils.parseEther((out * 0.70).toFixed(6));
+        const tx = await router.swapExactETHForTokens(
             minOut,
             [WBNB, BF_TOKEN],
             await signer.getAddress(),
-            deadline,
-            { 
-                value: ethers.utils.parseEther(val),
-                gasLimit: 500000
-            }
+            Math.floor(Date.now() / 1000) + 600,
+            { value: ethers.utils.parseEther(val) }
         );
         alert("已提交：" + tx.hash);
         await tx.wait();
@@ -377,10 +365,13 @@ buyBtn.onclick = async () => {
     }
 };
 
+// ===================== ✅ 最终卖出：支持自定义滑点 ✅ =====================
 sellBtn.onclick = async () => {
     if (!signer) return alert("请先连接钱包");
     const val = Number(payBf.value);
     if (!val || val <= 0) return alert("请输入正确的BF数量");
+
+    // 滑点
     const slippage = Number(slippageInput.value) || 25;
     const factor = (100 - slippage) / 100;
 

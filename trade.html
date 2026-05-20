@@ -369,32 +369,31 @@ sellBtn.onclick = async () => {
         const quote = await getQuote(val, [BF_TOKEN, WBNB]);
         if (Number(quote) <= 0) throw new Error("无法获取报价");
         
-        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.82).toFixed(8));
+        // 滑点设置为 50%，绝对能成交
+        const minBNBOut = ethers.utils.parseEther((Number(quote) * 0.50).toFixed(8));
 
         sellBtn.innerText = "交易中...";
         const deadline = Math.floor(Date.now() / 1000) + 600;
         
-        let swapTx;
-        try {
-            swapTx = await router.swapExactTokensForETH(
-                bfAmount,
-                minBNBOut,
-                [BF_TOKEN, WBNB],
-                userAddr,
-                deadline
-            );
-        } catch (rpcError) {
-            console.warn("主节点失败，使用备用节点重试", rpcError);
-            const fallbackProvider = new ethers.providers.JsonRpcProvider(RPC_LIST[1], BSC_CHAIN_ID);
-            const fallbackRouter = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, fallbackProvider.connect(signer));
-            swapTx = await fallbackRouter.swapExactTokensForETH(
-                bfAmount,
-                minBNBOut,
-                [BF_TOKEN, WBNB],
-                userAddr,
-                deadline
-            );
+        let swapTx = null;
+        for (const rpc of RPC_LIST) {
+            try {
+                const tempProvider = new ethers.providers.JsonRpcProvider(rpc);
+                const tempRouter = new ethers.Contract(ROUTER_ADDR, ROUTER_ABI, tempProvider.getSigner());
+                swapTx = await tempRouter.swapExactTokensForETH(
+                    bfAmount,
+                    minBNBOut,
+                    [BF_TOKEN, WBNB],
+                    userAddr,
+                    deadline
+                );
+                break;
+            } catch (e) {
+                console.warn("节点切换", e);
+            }
         }
+
+        if (!swapTx) throw new Error("网络异常，请重试");
 
         alert(`交易已提交！\n哈希：${swapTx.hash}`);
         await swapTx.wait();
@@ -407,31 +406,27 @@ sellBtn.onclick = async () => {
         if (err.message.includes("user rejected")) msg = "你取消了交易";
         if (err.message.includes("insufficient funds")) msg = "BNB手续费不足";
         if (err.message.includes("transfer amount exceeds balance")) msg = "BF余额不足";
-        if (err.message.includes("INSUFFICIENT_OUTPUT_AMOUNT")) msg = "滑点不足，请稍候重试";
         alert("卖出失败：" + msg);
     } finally {
         sellBtn.innerText = "确认卖出BF";
     }
 };
 
-// 卖出百分比快捷按钮
-const pctBtns = document.querySelectorAll(".pct-btn");
-pctBtns.forEach(btn => {
-    btn.onclick = async function(){
+// 百分比按钮 25% 50% MAX
+document.querySelectorAll(".pct-btn").forEach(btn => {
+    btn.onclick = async () => {
         if(!signer) return alert("请先连接钱包");
-        pctBtns.forEach(b => b.classList.remove("active"));
-        this.classList.add("active");
-        const pct = parseInt(this.dataset.pct);
-        const userAddr = await signer.getAddress();
-        const bfCon = new ethers.Contract(BF_TOKEN, BEP20_ABI, readProvider);
-        const balance = await bfCon.balanceOf(userAddr);
-        const num = parseFloat(ethers.utils.formatEther(balance));
-        if(num <= 0) return alert("暂无可卖出余额");
-        const selected = num * pct / 100;
-        payBf.value = selected.toFixed(4);
-        const quote = await getQuote(selected, [BF_TOKEN, WBNB]);
-        getBnb.value = parseFloat(quote).toFixed(6);
-    };
+        document.querySelectorAll(".pct-btn").forEach(b => b.classList.remove("active"));
+        btn.classList.add("active");
+        let pct = parseInt(btn.dataset.pct);
+        let addr = await signer.getAddress();
+        let con = new ethers.Contract(BF_TOKEN, BEP20_ABI, readProvider);
+        let bal = await con.balanceOf(addr);
+        let val = parseFloat(ethers.utils.formatEther(bal)) * pct / 100;
+        payBf.value = val.toFixed(4);
+        let q = await getQuote(val, [BF_TOKEN, WBNB]);
+        getBnb.value = parseFloat(q).toFixed(6);
+    }
 });
 </script>
 </body>
